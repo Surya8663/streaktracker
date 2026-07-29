@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: streaktrack-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -w server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        value: https://streaktrack.vercel.app

@@ -1,0 +1,76 @@
+/* ── Google Fonts ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@import 'tailwindcss';
+
+/* ── Custom base styles ──────────────────────────────────────── */
+@layer base {
+  body {
+    @apply bg-stone-50 text-slate-800 antialiased min-h-screen selection:bg-teal-100 selection:text-teal-900;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Smooth page scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ── Component & Utility Layer ───────────────────────────────── */
+@layer components {
+  /* Animated press-down on buttons */
+  .btn-press {
+    @apply transition-all duration-150 ease-in-out active:scale-[0.97];
+  }
+
+  /* Glass card style */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-stone-200/60 rounded-3xl shadow-sm;
+  }
+
+  /* Scrollbar styling for calendar grids */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d6d3d1 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-stone-300 rounded-full;
+  }
+}
+
+/* ── Micro-animation Keyframes ───────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(20, 184, 166, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.6); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}

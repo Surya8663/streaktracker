@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files (CRITICAL: never commit secrets or env)
+.env
+.env.local
+.env.production
+.env.development
+.env.*
+
+# SQLite database & uploads
+*.db
+*.sqlite
+*.sqlite3
+data/
+server/data/
+uploads/
+server/uploads/
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs & TypeScript
+*.log
+npm-debug.log*
+*.tsbuildinfo
+*.local
