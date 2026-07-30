@@ -198,6 +198,59 @@ export interface ServerToClientEvents {
   'milestone:completed': (payload: MilestoneWonPayload) => void;
 }
 
+// ── Month 1 Roadmap Types ────────────────────────────────────
+export type TaskCategory = 'DSA' | 'LeetCode' | 'Python' | 'System Design' | 'AI Engineer';
+export type RoadmapProfileStatus = 'not_started' | 'active' | 'completed';
+
+export interface RoadmapTask {
+  id: number;
+  dayNumber: number;
+  weekNumber: number;
+  title: string;
+  category: TaskCategory;
+  recommendedMinutes: number;
+  sortOrder: number;
+  isCompleted?: boolean;
+  completedAt?: string | null;
+}
+
+export interface UserRoadmapProfile {
+  userId: number;
+  status: RoadmapProfileStatus;
+  currentDay: number;
+  startDate: string | null;
+  completionDate: string | null;
+  totalCompletedTasks: number;
+  totalTasks: number;
+  totalMinutesStudied: number;
+}
+
+export interface DailyRoadmapSession {
+  id: number;
+  userId: number;
+  date: string;
+  minutesStudied: number;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface ToggleTaskRequest {
+  taskId: number;
+  isCompleted: boolean;
+}
+
+export interface LogRoadmapSessionRequest {
+  date: string;
+  minutesStudied: number;
+  notes?: string;
+}
+
+export interface UpdateRoadmapProfileRequest {
+  status?: RoadmapProfileStatus;
+  currentDay?: number;
+}
+
+
 export interface ClientToServerEvents {
   'client:ping': () => void;
 }

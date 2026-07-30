@@ -62,13 +62,12 @@ const gomathi = db.prepare('SELECT id FROM users WHERE email = ?').get('gomathi@
 db.prepare('DELETE FROM daily_logs').run();
 db.prepare('DELETE FROM milestones').run();
 
-console.log('\n🌱 Seeding daily logs for Surya and Gomathi (18 days of data)...\n');
+console.log('\n🌱 Seeding daily logs for Surya (Gomathi remains at Day 0)...\n');
 
 const insertLog = db.prepare(
   'INSERT OR REPLACE INTO daily_logs (user_id, date, topics_studied, hours_spent, notes) VALUES (?, ?, ?, ?, ?)',
 );
 
-// ── Extended logs: 18 days to create 3 completed 5-day blocks + current block
 const suryaLogs = [
   // Block 1 (days 18-14)
   { daysAgo: 18, hours: 3.0, topics: 'JavaScript fundamentals & closures', notes: 'Reviewed scope chain and closures deeply.' },
@@ -101,42 +100,20 @@ for (const log of suryaLogs) {
   console.log(`  📝 Logged for Surya (${dateStr}): ${log.hours} hrs - ${log.topics}`);
 }
 
-const gomathiLogs = [
-  // Block 1 (days 18-14) — Gomathi wins this block (19.5 vs 16.0)
-  { daysAgo: 18, hours: 5.0, topics: 'Python data structures & algorithms', notes: 'Implemented binary search tree.' },
-  { daysAgo: 17, hours: 4.0, topics: 'React hooks deep-dive: useReducer & useContext', notes: 'Rebuilt state management from scratch.' },
-  { daysAgo: 16, hours: 3.5, topics: 'API design patterns & REST conventions', notes: 'Studied RESTful resource naming.' },
-  { daysAgo: 15, hours: 4.0, topics: 'MongoDB aggregation pipeline', notes: 'Complex multi-stage aggregations.' },
-  { daysAgo: 14, hours: 3.0, topics: 'Docker containerization basics', notes: 'Created multi-stage Dockerfiles.' },
-  // Block 2 (days 13-9) — Surya wins this block (15.5 vs 12.0)
-  { daysAgo: 13, hours: 2.0, topics: 'CI/CD pipelines with GitHub Actions', notes: 'Set up automated testing workflow.' },
-  { daysAgo: 12, hours: 3.0, topics: 'Frontend testing with Vitest & React Testing Library', notes: 'Wrote component tests.' },
-  { daysAgo: 11, hours: 2.5, topics: 'Web accessibility (a11y) audit', notes: 'Fixed keyboard navigation issues.' },
-  { daysAgo: 10, hours: 2.5, topics: 'Performance profiling with Lighthouse', notes: 'Optimized largest contentful paint.' },
-  { daysAgo: 9, hours: 2.0, topics: 'GraphQL fundamentals & Apollo', notes: 'Built first GraphQL schema.' },
-  // Block 3 (days 8-4) — Tie! (16.5 vs 16.5)
-  { daysAgo: 8, hours: 3.5, topics: 'State management: Zustand vs Jotai', notes: 'Compared lightweight state libraries.' },
-  { daysAgo: 7, hours: 4.0, topics: 'CSS animations & @keyframes mastery', notes: 'Created micro-interaction library.' },
-  { daysAgo: 6, hours: 4.0, topics: 'System architecture and API contracts', notes: 'Drafted implementation plan.' },
-  { daysAgo: 5, hours: 3.5, topics: 'Frontend UI components design', notes: 'Styled rounded cards and avatars.' },
-  { daysAgo: 4, hours: 1.5, topics: 'Code cleanup & documentation', notes: 'Added JSDoc comments.' },
-  // Current block (days 3-0)
-  { daysAgo: 2, hours: 1.0, topics: 'Code review and refactoring', notes: 'Cleaned up imports.' },
-  { daysAgo: 1, hours: 4.5, topics: 'Webhooks and Socket.io realtime broadcasting', notes: 'Set up socket listeners.' },
-  { daysAgo: 0, hours: 2.5, topics: 'CSS Grid layouts & Framer Motion transitions', notes: 'Designed contribution calendar component.' },
-];
+// Reset Gomathi's profile state to Day 0
+db.prepare(`
+  INSERT INTO user_roadmap_profiles (user_id, status, current_day, start_date, completion_date)
+  VALUES (?, 'not_started', 0, NULL, NULL)
+  ON CONFLICT(user_id) DO UPDATE SET
+    status = 'not_started',
+    current_day = 0,
+    start_date = NULL,
+    completion_date = NULL
+`).run(gomathi.id);
 
-for (const log of gomathiLogs) {
-  const dateStr = getDateDaysAgo(log.daysAgo);
-  insertLog.run(gomathi.id, dateStr, log.topics, log.hours, log.notes);
-  console.log(`  📝 Logged for Gomathi (${dateStr}): ${log.hours} hrs - ${log.topics}`);
-}
+db.prepare('DELETE FROM user_roadmap_tasks WHERE user_id = ?').run(gomathi.id);
+db.prepare('DELETE FROM daily_roadmap_sessions WHERE user_id = ?').run(gomathi.id);
 
-console.log('\n📊 Block Summary:');
-console.log('  Block 1 (days 18-14): Surya 16.0 hrs vs Gomathi 19.5 hrs → 🏆 Gomathi wins!');
-console.log('  Block 2 (days 13-9):  Surya 15.5 hrs vs Gomathi 12.0 hrs → 🏆 Surya wins!');
-console.log('  Block 3 (days 8-4):   Surya 16.5 hrs vs Gomathi 16.5 hrs → 🤝 Draw!');
-console.log('  Block 4 (current):    In progress...\n');
-
+console.log('\n📊 Gomathi Status: Day 0 (0 logs, 0 streak, 0 completed tasks)');
 console.log('🎉 Seed complete!\n');
 process.exit(0);
