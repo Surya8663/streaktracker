@@ -7,6 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { API_ROUTES, SOCKET_EVENTS } from '@streaktrack/shared';
 import type {
   Month1RoadmapResponse,
+  RoadmapDay,
   RoadmapTask,
   TaskCategory,
   UserProgressSummary,
@@ -445,7 +446,7 @@ export const RoadmapPage: React.FC = () => {
 
   const selectedDayData = useMemo(() => {
     if (!selectedDayNum || !roadmapData) return null;
-    return roadmapData.days.find((d) => d.dayNumber === selectedDayNum) || null;
+    return roadmapData.days.find((d: RoadmapDay) => d.dayNumber === selectedDayNum) || null;
   }, [roadmapData, selectedDayNum]);
 
   const categoryTasksByDay = useMemo(() => {
@@ -453,7 +454,7 @@ export const RoadmapPage: React.FC = () => {
     const category = activeTab as TaskCategory;
     const dayMap = new Map<number, { dayNumber: number; weekNumber: number; tasks: RoadmapTask[]; isUnlocked: boolean }>();
     for (const day of roadmapData.days) {
-      const catTasks = day.tasks.filter((t) => t.category === category);
+      const catTasks = day.tasks.filter((t: RoadmapTask) => t.category === category);
       if (catTasks.length > 0) dayMap.set(day.dayNumber, { dayNumber: day.dayNumber, weekNumber: day.weekNumber, tasks: catTasks, isUnlocked: day.isUnlocked });
     }
     return Array.from(dayMap.values()).sort((a, b) => a.dayNumber - b.dayNumber);
@@ -654,10 +655,10 @@ export const RoadmapPage: React.FC = () => {
 
               {/* Day Cards Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                {filteredDays.map((day) => {
+                {filteredDays.map((day: RoadmapDay) => {
                   const isCurrentDay = myProgress?.currentDay === day.dayNumber && myProgress?.status === 'active';
                   const pct = day.totalTasksCount > 0 ? Math.round((day.completedTasksCount / day.totalTasksCount) * 100) : 0;
-                  const cats = Array.from(new Set(day.tasks.map((t) => t.category)));
+                  const cats = Array.from(new Set(day.tasks.map((t: RoadmapTask) => t.category))) as TaskCategory[];
 
                   return (
                     <motion.button
@@ -701,10 +702,10 @@ export const RoadmapPage: React.FC = () => {
 
                       {/* Category Dots */}
                       <div className="flex flex-wrap gap-1 mb-3">
-                        {cats.map((cat) => (
+                        {cats.map((cat: TaskCategory) => (
                           <span
-                            key={cat}
-                            title={cat}
+                            key={cat as string}
+                            title={cat as string}
                             className="h-1.5 w-6 rounded-full"
                             style={{ background: `linear-gradient(to right, ${getCatStartColor(cat)}, ${getCatEndColor(cat)})` }}
                           />
@@ -814,7 +815,7 @@ export const RoadmapPage: React.FC = () => {
                               <p className="text-[10px] text-slate-600 italic px-1">No links saved yet.</p>
                             ) : (
                               <div className="space-y-2">
-                                {source.links.map((link) => (
+                                {source.links.map((link: RoadmapSourceLink) => (
                                   <div key={link.id} className="rounded-xl border border-white/[0.06] bg-black/20 p-3 space-y-1.5 hover:border-white/[0.12] transition-all group/link">
                                     <div className="flex items-start justify-between gap-2">
                                       <a href={link.url} target="_blank" rel="noopener noreferrer" className={`text-xs font-bold flex items-center gap-1.5 hover:underline leading-snug break-all ${cfg.text}`}>
@@ -956,8 +957,8 @@ export const RoadmapPage: React.FC = () => {
 
               {/* Task Groups by Category */}
               <div className="px-6 py-5 space-y-4">
-                {CATEGORIES.map((cat) => {
-                  const catTasks = selectedDayData.tasks.filter((t) => t.category === cat);
+                {CATEGORIES.map((cat: TaskCategory) => {
+                  const catTasks = selectedDayData.tasks.filter((t: RoadmapTask) => t.category === cat);
                   if (catTasks.length === 0) return null;
                   const cfg = CAT_CONFIG[cat];
                   return (
@@ -967,7 +968,7 @@ export const RoadmapPage: React.FC = () => {
                         <span className={`text-xs font-black uppercase tracking-wider ${cfg.text}`}>{cat}</span>
                       </div>
                       <div className="space-y-2">
-                        {catTasks.map((task) => {
+                        {catTasks.map((task: RoadmapTask) => {
                           const isChecked = !!task.isCompleted;
                           return (
                             <div
