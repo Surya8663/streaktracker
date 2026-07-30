@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import DatabaseConstructor from 'better-sqlite3';
 import type { Database } from 'better-sqlite3';
+import bcrypt from 'bcrypt';
 
 const DB_PATH = process.env.DATABASE_PATH || './data/streaktrack.db';
 
@@ -82,6 +83,19 @@ if (count === 0) {
   insertPhase.run(5, 'Applications & Placement Push', 'Month 6: Resume Polish, Off-Campus Referrals & HR Prep', 151, 180, 80, '🔥');
 }
 
+// Seed default users if users table is empty
+const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
+if (userCount === 0) {
+  const insertUser = db.prepare(
+    'INSERT INTO users (name, email, password_hash, profile_picture, bio) VALUES (?, ?, ?, ?, ?)',
+  );
+  const suryaHash = bcrypt.hashSync('surya123', 10);
+  const gomathiHash = bcrypt.hashSync('gomathi123', 10);
+  insertUser.run('Surya', 'surya@streaktrack.app', suryaHash, '/avatars/surya.jpg', 'Target: Product-based MNC as SDE 🎯');
+  insertUser.run('Gomathi', 'gomathi@streaktrack.app', gomathiHash, '/avatars/gomathi.jpg', 'Target: Product-based MNC as SDE 🎯');
+  console.log('[db] Auto-seeded default users: Surya & Gomathi');
+}
+
 // Ensure bio column exists for existing databases
 try {
   db.exec("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT 'Target: Product-based MNC as SDE 🎯'");
@@ -92,3 +106,4 @@ try {
 console.log(`[db] SQLite connected: ${DB_PATH}`);
 
 export default db;
+
