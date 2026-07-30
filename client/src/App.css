@@ -90,3 +90,17 @@ html {
     animation: none !important;
   }
 }
+
+/* ── Hide scrollbar utility (for roadmap tab nav) ──────────── */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Roadmap dark page fills ──────────────────────────────── */
+.roadmap-dark-page {
+  background: linear-gradient(to bottom, #020817 0%, #0b1120 100%);
+}

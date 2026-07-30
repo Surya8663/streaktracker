@@ -9,12 +9,13 @@ import { StreakCalendar } from '../components/StreakCalendar';
 import { TreatBadge } from '../components/TreatBadge';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { ProfileCard } from '../components/ProfileCard';
+import { StudyChatPanel } from '../components/StudyChatPanel';
 import { ComparisonDashboardPage } from './ComparisonDashboardPage';
 import { MilestonesPage } from './MilestonesPage';
 import { RoadmapPage } from './RoadmapPage';
 import { ProfilePage } from './ProfilePage';
 import { APP_NAME, SOCKET_EVENTS, API_ROUTES } from '@streaktrack/shared';
-import type { DailyLog, StreakResponse, LogUpdatedPayload, MilestoneResponse, Month1RoadmapResponse, RoadmapUpdatedPayload } from '@streaktrack/shared';
+import type { DailyLog, StreakResponse, LogUpdatedPayload, MilestoneResponse, Month1RoadmapResponse, RoadmapUpdatedPayload, RoadmapChatMessage } from '@streaktrack/shared';
 import { getApiUrl } from '../utils/api.js';
 
 function getTodayString(): string {
@@ -59,6 +60,7 @@ export const HomePage: React.FC = () => {
   const [roadmapData, setRoadmapData] = useState<Month1RoadmapResponse | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [loadingRoadmap, setLoadingRoadmap] = useState(true);
+  const [chatMessages, setChatMessages] = useState<RoadmapChatMessage[]>([]);
 
   // Fetch Month 1 Roadmap data
   const fetchRoadmapData = useCallback(async () => {
@@ -133,10 +135,19 @@ export const HomePage: React.FC = () => {
     }
   }, []);
 
+  // Fetch initial chat messages for dashboard sidebar
+  const fetchChatMessages = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_CHAT), { credentials: 'include' });
+      if (res.ok) setChatMessages(await res.json());
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     fetchUserData();
     fetchRoadmapData();
-  }, [fetchUserData, fetchRoadmapData]);
+    fetchChatMessages();
+  }, [fetchUserData, fetchRoadmapData, fetchChatMessages]);
 
   // Optimized socket event handlers
   useEffect(() => {
@@ -165,14 +176,23 @@ export const HomePage: React.FC = () => {
       fetchRoadmapData();
     };
 
+    const handleChatMessage = (newMsg: RoadmapChatMessage) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    };
+
     socket.on(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
     socket.on(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
     socket.on(SOCKET_EVENTS.ROADMAP_UPDATED, handleRoadmapUpdated);
+    socket.on(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
 
     return () => {
       socket.off(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
       socket.off(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
       socket.off(SOCKET_EVENTS.ROADMAP_UPDATED, handleRoadmapUpdated);
+      socket.off(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
     };
   }, [socket, user, fetchStreakOnly, fetchMilestonesOnly, fetchRoadmapData]);
 
@@ -227,6 +247,11 @@ export const HomePage: React.FC = () => {
     ? milestoneData.treatScoreboard.find((t) => t.userId === user.id)?.treatsOwed || 0
     : 0;
   const otherUserName = user?.name === 'Surya' ? 'Gomathi' : 'Surya';
+
+  // Partner info for chat panel
+  const partnerProgress = roadmapData?.partnerProgress;
+  const partnerIsOnline = partnerProgress ? isOnline(partnerProgress.userId) : false;
+  const partnerName = partnerProgress?.userName || otherUserName;
 
   // Derived key stats for hero stats strip
   const currentStreak = personalStreak?.currentStreak || 0;
@@ -496,10 +521,19 @@ export const HomePage: React.FC = () => {
                   </section>
                 </div>
 
-                {/* ── Right Sidebar (4 cols): ProfileCard, TreatBadge & Personal Streak Calendar ── */}
-                <div className="lg:col-span-4 space-y-8">
+                {/* ── Right Sidebar (4 cols): ProfileCard, StudyChat, TreatBadge & Streak Calendar ── */}
+                <div className="lg:col-span-4 space-y-6">
                   {/* Profile Card with GitHub & LinkedIn Links */}
                   <ProfileCard user={user} isOnline={userIsOnline} />
+
+                  {/* Study Chat Panel — now on Dashboard sidebar */}
+                  <StudyChatPanel
+                    messages={chatMessages}
+                    currentUserId={user?.id || 0}
+                    partnerName={partnerName}
+                    partnerIsOnline={partnerIsOnline}
+                    onNewMessage={(msg) => setChatMessages((prev) => prev.some((m) => m.id === msg.id) ? prev : [...prev, msg])}
+                  />
 
                   {/* Treat Badge */}
                   <TreatBadge
