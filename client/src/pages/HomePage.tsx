@@ -7,6 +7,7 @@ import { DailyLogForm } from '../components/DailyLogForm';
 import { RecentLogsList } from '../components/RecentLogsList';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { TreatBadge } from '../components/TreatBadge';
+import { AnimatedCounter } from '../components/AnimatedCounter';
 import { ComparisonDashboardPage } from './ComparisonDashboardPage';
 import { MilestonesPage } from './MilestonesPage';
 import { RoadmapPage } from './RoadmapPage';
@@ -177,6 +178,14 @@ export const HomePage: React.FC = () => {
     : 0;
   const otherUserName = user?.name === 'Surya' ? 'Gomathi' : 'Surya';
 
+  // Derived key stats for hero stats strip
+  const currentStreak = personalStreak?.currentStreak || 0;
+  const totalHours = personalStreak?.totalHours || 0;
+  const longestStreak = personalStreak?.longestStreak || 0;
+  const daysActive = personalStreak?.totalDaysLogged || (personalStreak?.calendarData
+    ? personalStreak.calendarData.filter((d) => d.hoursSpent > 0).length
+    : 0);
+
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800">
       {/* ═══ Top Navigation Bar (Single Sticky Blur Header) ═══ */}
@@ -287,65 +296,175 @@ export const HomePage: React.FC = () => {
               transition={pageTransition}
               className="space-y-6 sm:space-y-8"
             >
-              {/* Profile Welcome Banner */}
-              <div className="glass-card p-5 sm:p-8">
+              {/* Profile Welcome Banner (Gamified Energy Header) */}
+              <div className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-emerald-500/10 p-6 sm:p-7 shadow-xs border-t-3 border-t-amber-500">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
                   <div className="flex items-center gap-4 sm:gap-5 cursor-pointer" onClick={() => switchTab('profile')}>
                     <Avatar name={user?.name || ''} src={user?.profilePicture} size="xl" showStatus isOnline={userIsOnline} />
                     <div>
-                      <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="rounded-full bg-amber-500/20 text-amber-950 text-[11px] font-black px-2.5 py-0.5 border border-amber-300/60 shadow-2xs">
+                          🔥 Streak Warrior
+                        </span>
+                        <span className="rounded-full bg-emerald-500/15 text-emerald-900 text-[11px] font-extrabold px-2.5 py-0.5 border border-emerald-300/50">
+                          Leveling Up
+                        </span>
+                      </div>
+                      <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                         Welcome back, {user?.name}! 👋
                       </h1>
-                      <p className="mt-0.5 text-xs sm:text-sm text-slate-500">
-                        Track your daily progress and keep your study streak alive.
+                      <p className="mt-0.5 text-xs sm:text-sm text-slate-600 font-medium">
+                        Track your daily study progress and keep your momentum burning.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium">
+                  <div className="flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold shadow-2xs">
                     <span
-                      className={`inline-block h-2 w-2 rounded-full ${
+                      className={`inline-block h-2.5 w-2.5 rounded-full ${
                         socket?.connected
-                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
                           : 'bg-slate-400'
                       }`}
                     />
-                    <span className="text-slate-600 font-semibold">
+                    <span className="text-slate-700 font-bold">
                       {socket?.connected ? `${user?.name} (Online)` : 'Connecting...'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Treat Badge */}
-              <TreatBadge
-                otherUserName={otherUserName}
-                treatsOwedCount={treatsOwedCount}
-                onClick={() => switchTab('milestones')}
-              />
-
-              {/* Personal Streak Calendar */}
-              {personalStreak && (
-                <section>
-                  <StreakCalendar data={personalStreak} isOnline={userIsOnline} />
-                </section>
-              )}
-
-              {/* Daily Log Form */}
-              <section>
-                <DailyLogForm todayLog={todayLog} onLogSaved={handleLogSaved} />
-              </section>
-
-              {/* Recent Logs */}
-              <section>
-                {loadingLogs ? (
-                  <div className="glass-card p-8 text-center text-slate-400 text-sm">
-                    Loading recent entries...
+              {/* Hero XP Stats Strip (4 Bold Achievement Cards) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Current Streak Card (Hero Vivid Flame Gradient) */}
+                <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 text-white p-4 sm:p-5 shadow-md border border-amber-400/40 hover:scale-[1.02] transition-all cursor-pointer relative overflow-hidden group">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">🔥</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full backdrop-blur-2xs">
+                      Current
+                    </span>
                   </div>
-                ) : (
-                  <RecentLogsList logs={logs} />
-                )}
-              </section>
+                  <p className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-xs">
+                    <AnimatedCounter value={currentStreak} />
+                  </p>
+                  <p className="text-xs font-bold text-amber-100/90 mt-0.5">
+                    {currentStreak === 1 ? 'Day Streak' : 'Days Streak'}
+                  </p>
+                </div>
+
+                {/* 2. Total Hours Card */}
+                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-emerald-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">⏱️</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                      All-Time
+                    </span>
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    <AnimatedCounter value={totalHours} decimals={1} />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Total Hours Logged</p>
+                </div>
+
+                {/* 3. Longest Streak Card */}
+                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-amber-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">⚡</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                      Record
+                    </span>
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    <AnimatedCounter value={longestStreak} />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Best Streak Record</p>
+                </div>
+
+                {/* 4. Active Days Card */}
+                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-teal-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">🎯</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-100/80 px-2 py-0.5 rounded-full">
+                      Consistency
+                    </span>
+                  </div>
+                  <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    <AnimatedCounter value={daysActive} />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Days Active</p>
+                </div>
+              </div>
+
+              {/* Dynamic 2-Column Grid on Desktop (lg:grid lg:grid-cols-12 lg:gap-8) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* ── Left Column (8 cols): Daily Log Form & Recent Entries ── */}
+                <div className="lg:col-span-8 space-y-8">
+                  {/* Daily Log Form */}
+                  <section className="rounded-3xl border border-stone-200/80 bg-white shadow-2xs border-t-3 border-t-teal-500 overflow-hidden">
+                    <DailyLogForm todayLog={todayLog} onLogSaved={handleLogSaved} />
+                  </section>
+
+                  {/* Recent Logs List with Pulse Skeleton Loader */}
+                  <section>
+                    {loadingLogs ? (
+                      <div className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-2xs space-y-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="h-6 w-36 bg-stone-200/80 rounded-lg animate-pulse" />
+                          <div className="h-4 w-20 bg-stone-100 rounded-lg animate-pulse" />
+                        </div>
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="rounded-2xl border border-stone-100 p-5 space-y-3 bg-stone-50/50 animate-pulse">
+                            <div className="flex items-center justify-between">
+                              <div className="h-4 w-28 bg-stone-200 rounded-md" />
+                              <div className="h-4 w-16 bg-amber-100 rounded-full" />
+                            </div>
+                            <div className="h-5 w-3/4 bg-stone-200 rounded-md" />
+                            <div className="h-3 w-1/2 bg-stone-100 rounded-md" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <RecentLogsList logs={logs} />
+                    )}
+                  </section>
+                </div>
+
+                {/* ── Right Sidebar (4 cols): TreatBadge & Personal Streak Calendar ── */}
+                <div className="lg:col-span-4 space-y-8">
+                  {/* Treat Badge */}
+                  <TreatBadge
+                    otherUserName={otherUserName}
+                    treatsOwedCount={treatsOwedCount}
+                    onClick={() => switchTab('milestones')}
+                  />
+
+                  {/* Personal Streak Calendar */}
+                  {personalStreak && (
+                    <section className="rounded-3xl border border-stone-200/80 bg-white p-2 shadow-2xs border-t-3 border-t-amber-500">
+                      <StreakCalendar data={personalStreak} isOnline={userIsOnline} />
+                    </section>
+                  )}
+
+                  {/* Quick Streak Highlights / XP Card */}
+                  {milestoneData?.currentBlock && (
+                    <div className="rounded-3xl border border-stone-200/80 bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 p-6 shadow-2xs space-y-3 border-t-3 border-t-amber-400">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">🏆</span>
+                        <h3 className="font-black text-slate-800 text-sm">Sprint Milestone Status</h3>
+                      </div>
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                        Block #{milestoneData.currentBlock.blockNumber} ends in <span className="font-extrabold text-amber-900">{milestoneData.currentBlock.daysRemaining} days</span>. Keep logging daily to claim treat bragging rights! 🍫
+                      </p>
+                      <button
+                        onClick={() => switchTab('milestones')}
+                        className="btn-press cursor-pointer w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 px-4 shadow-xs transition-colors"
+                      >
+                        View Milestones & Scoreboard →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </motion.div>
           )}
 
