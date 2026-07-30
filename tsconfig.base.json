@@ -12,6 +12,9 @@
     "isolatedModules": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@streaktrack/shared": ["../shared/src/index.ts"]
+    }
   }
 }

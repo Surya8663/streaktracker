@@ -441,7 +441,7 @@ export const RoadmapPage: React.FC = () => {
 
   const filteredDays = useMemo(() => {
     const days = roadmapData?.days || [];
-    return selectedWeek === 0 ? days : days.filter((d) => d.weekNumber === selectedWeek);
+    return selectedWeek === 0 ? days : days.filter((d: RoadmapDay) => d.weekNumber === selectedWeek);
   }, [roadmapData, selectedWeek]);
 
   const selectedDayData = useMemo(() => {

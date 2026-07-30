@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { API_ROUTES, SOCKET_EVENTS } from '@streaktrack/shared';
-import type { MilestoneResponse, Milestone, LogUpdatedPayload, MilestoneWonPayload } from '@streaktrack/shared';
+import type { MilestoneResponse, Milestone, TreatScore, LogUpdatedPayload, MilestoneWonPayload } from '@streaktrack/shared';
 import { Avatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -125,7 +125,7 @@ export const MilestonesPage: React.FC = () => {
 
           {/* Treat Totals Summary Pills */}
           <div className="flex flex-wrap items-center gap-4">
-            {treatScoreboard.map((score) => {
+            {treatScoreboard.map((score: TreatScore) => {
               const isCurrentUser = user?.id === score.userId;
               return (
                 <div
@@ -259,7 +259,7 @@ export const MilestonesPage: React.FC = () => {
             {milestones
               .slice()
               .reverse()
-              .map((milestone) => (
+              .map((milestone: Milestone) => (
                 <div
                   key={milestone.blockNumber}
                   className={`rounded-3xl border p-6 transition-all shadow-2xs hover:shadow-md ${
