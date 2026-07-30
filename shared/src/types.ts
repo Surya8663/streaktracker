@@ -197,7 +197,7 @@ export interface RoadmapWonPayload {
 
 export interface RoadmapUpdatedPayload {
   userId: number;
-  type: 'progress' | 'start' | 'save_day' | 'task_crud';
+  type: 'progress' | 'start' | 'save_day' | 'task_crud' | 'source_crud';
   dayNumber?: number;
   taskId?: number;
 }
@@ -305,6 +305,46 @@ export interface UpdateRoadmapTaskRequest {
   category?: TaskCategory;
   recommendedMinutes?: number;
   sortOrder?: number;
+}
+
+// ── Shared Source Vault Types ────────────────────────────────
+export interface RoadmapSourceLink {
+  id: number;
+  sourceId: number;
+  title: string;
+  url: string;
+  note: string | null;
+  addedByUserId: number;
+  addedByName: string;
+  addedByAvatar: string | null;
+  createdAt: string;
+}
+
+export interface RoadmapSource {
+  id: number;
+  category: TaskCategory;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  links: RoadmapSourceLink[];
+}
+
+export interface CreateSourceGroupRequest {
+  category: TaskCategory;
+  name: string;
+  sortOrder?: number;
+}
+
+export interface CreateSourceLinkRequest {
+  title: string;
+  url: string;
+  note?: string;
+}
+
+export interface UpdateSourceLinkRequest {
+  title?: string;
+  url?: string;
+  note?: string;
 }
 
 

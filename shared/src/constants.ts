@@ -11,6 +11,7 @@ export const API_ROUTES = {
   ROADMAP: '/api/roadmap',
   ROADMAP_MONTH1: '/api/roadmap/month1',
   ROADMAP_TASKS: '/api/roadmap/tasks',
+  ROADMAP_SOURCES: '/api/roadmap/sources',
   PROFILE: '/api/profile',
   UPLOAD_AVATAR: '/api/profile/avatar',
 } as const;

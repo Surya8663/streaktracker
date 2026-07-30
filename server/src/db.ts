@@ -125,6 +125,31 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_daily_roadmap_sessions_user_date ON daily_roadmap_sessions(user_id, date);
+
+  CREATE TABLE IF NOT EXISTS roadmap_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(category, name)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_roadmap_sources_cat ON roadmap_sources(category);
+
+  CREATE TABLE IF NOT EXISTS roadmap_source_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    note TEXT,
+    added_by_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (source_id) REFERENCES roadmap_sources(id) ON DELETE CASCADE,
+    FOREIGN KEY (added_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_roadmap_source_links_source ON roadmap_source_links(source_id);
 `);
 
 // Ensure bio, github_url, linkedin_url columns exist for existing databases
@@ -186,6 +211,32 @@ if (userCount === 0) {
     'https://www.linkedin.com/in/gomathi-dhandapani-47435b350/',
   );
   console.log('[db] Auto-seeded default users: Surya & Gomathi');
+}
+
+// ── Auto-seed 12 default study sources across 5 categories ──────────────
+const sourceCount = (db.prepare('SELECT COUNT(*) as count FROM roadmap_sources').get() as { count: number }).count;
+if (sourceCount === 0) {
+  const insertSource = db.prepare('INSERT INTO roadmap_sources (category, name, sort_order) VALUES (?, ?, ?)');
+
+  const defaultSources: { category: string; name: string; sortOrder: number }[] = [
+    { category: 'DSA', name: 'Striver / takeUforward', sortOrder: 1 },
+    { category: 'DSA', name: 'Abdul Bari', sortOrder: 2 },
+    { category: 'LeetCode', name: 'NeetCode', sortOrder: 1 },
+    { category: 'Python', name: 'freeCodeCamp Python Full Course', sortOrder: 1 },
+    { category: 'Python', name: 'Corey Schafer', sortOrder: 2 },
+    { category: 'System Design', name: 'Gaurav Sen', sortOrder: 1 },
+    { category: 'System Design', name: 'ByteByteGo / Alex Xu', sortOrder: 2 },
+    { category: 'System Design', name: 'Tech Dummies / Narendra L', sortOrder: 3 },
+    { category: 'AI Engineer', name: '3Blue1Brown', sortOrder: 1 },
+    { category: 'AI Engineer', name: 'StatQuest with Josh Starmer', sortOrder: 2 },
+    { category: 'AI Engineer', name: 'Krish Naik / CampusX', sortOrder: 3 },
+    { category: 'AI Engineer', name: 'Andrej Karpathy', sortOrder: 4 },
+  ];
+
+  for (const s of defaultSources) {
+    insertSource.run(s.category, s.name, s.sortOrder);
+  }
+  console.log('[db] Auto-seeded 12 default study sources across 5 categories');
 }
 
 // ── Auto-seed Month 1 AI Engineer Roadmap tasks if table is empty ──────

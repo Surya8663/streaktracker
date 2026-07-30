@@ -796,4 +796,292 @@ router.put(`${API_ROUTES.ROADMAP}/phases/:id`, requireAuth, (req, res) => {
   }
 });
 
+// ── Shared Source Vault Types & Endpoints ────────────────────
+interface SourceRow {
+  id: number;
+  category: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+}
+
+interface SourceLinkRow {
+  id: number;
+  source_id: number;
+  title: string;
+  url: string;
+  note: string | null;
+  added_by_user_id: number;
+  user_name: string;
+  user_avatar: string | null;
+  created_at: string;
+}
+
+function isValidHttpUrl(stringUrl: string): boolean {
+  try {
+    const url = new URL(stringUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// GET /api/roadmap/sources
+router.get(API_ROUTES.ROADMAP_SOURCES, requireAuth, (_req, res) => {
+  try {
+    const sourceRows = db
+      .prepare('SELECT * FROM roadmap_sources ORDER BY category ASC, sort_order ASC, name ASC')
+      .all() as SourceRow[];
+
+    const linkRows = db
+      .prepare(`
+        SELECT l.*, u.name as user_name, u.profile_picture as user_avatar
+        FROM roadmap_source_links l
+        JOIN users u ON l.added_by_user_id = u.id
+        ORDER BY l.created_at DESC
+      `)
+      .all() as SourceLinkRow[];
+
+    const linksMap = new Map<number, any[]>();
+    for (const link of linkRows) {
+      if (!linksMap.has(link.source_id)) {
+        linksMap.set(link.source_id, []);
+      }
+      linksMap.get(link.source_id)!.push({
+        id: link.id,
+        sourceId: link.source_id,
+        title: link.title,
+        url: link.url,
+        note: link.note,
+        addedByUserId: link.added_by_user_id,
+        addedByName: link.user_name,
+        addedByAvatar: link.user_avatar,
+        createdAt: link.created_at,
+      });
+    }
+
+    const sources = sourceRows.map((s) => ({
+      id: s.id,
+      category: s.category,
+      name: s.name,
+      sortOrder: s.sort_order,
+      createdAt: s.created_at,
+      links: linksMap.get(s.id) || [],
+    }));
+
+    res.json(sources);
+  } catch (err: unknown) {
+    console.error('Error fetching roadmap sources:', err);
+    res.status(500).json({ message: 'Failed to fetch roadmap sources' });
+  }
+});
+
+// POST /api/roadmap/sources (Create Source Group)
+router.post(API_ROUTES.ROADMAP_SOURCES, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { category, name, sortOrder } = req.body;
+
+    if (!name || !name.trim()) {
+      res.status(400).json({ message: 'Source group name is required' });
+      return;
+    }
+
+    if (!VALID_CATEGORIES.includes(category)) {
+      res.status(400).json({ message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` });
+      return;
+    }
+
+    const sort = typeof sortOrder === 'number' ? sortOrder : 1;
+
+    const result = db
+      .prepare('INSERT INTO roadmap_sources (category, name, sort_order) VALUES (?, ?, ?)')
+      .run(category, name.trim(), sort);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'source_crud',
+    });
+
+    res.status(201).json({
+      message: 'Source group added successfully',
+      source: {
+        id: Number(result.lastInsertRowid),
+        category,
+        name: name.trim(),
+        sortOrder: sort,
+        links: [],
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error creating source group:', err);
+    res.status(500).json({ message: 'Failed to create source group' });
+  }
+});
+
+// POST /api/roadmap/sources/:sourceId/links (Add Link)
+router.post(`${API_ROUTES.ROADMAP_SOURCES}/:sourceId/links`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const sourceId = parseInt(String(req.params.sourceId), 10);
+    const { title, url, note } = req.body;
+
+    if (!title || !title.trim()) {
+      res.status(400).json({ message: 'Link title is required' });
+      return;
+    }
+
+    if (!url || !url.trim() || !isValidHttpUrl(url.trim())) {
+      res.status(400).json({ message: 'Invalid URL. Must be a valid link starting with http:// or https://' });
+      return;
+    }
+
+    const sourceExists = db.prepare('SELECT id FROM roadmap_sources WHERE id = ?').get(sourceId);
+    if (!sourceExists) {
+      res.status(404).json({ message: 'Source group not found' });
+      return;
+    }
+
+    const result = db
+      .prepare(`
+        INSERT INTO roadmap_source_links (source_id, title, url, note, added_by_user_id)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+      .run(sourceId, title.trim(), url.trim(), note ? note.trim() : null, userId);
+
+    const userRow = db.prepare('SELECT name, profile_picture FROM users WHERE id = ?').get(userId) as UserRow;
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'source_crud',
+    });
+
+    res.status(201).json({
+      message: 'Link added to source vault successfully!',
+      link: {
+        id: Number(result.lastInsertRowid),
+        sourceId,
+        title: title.trim(),
+        url: url.trim(),
+        note: note ? note.trim() : null,
+        addedByUserId: userId,
+        addedByName: userRow?.name || 'User',
+        addedByAvatar: userRow?.profile_picture || null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error adding source link:', err);
+    res.status(500).json({ message: 'Failed to add link to source vault' });
+  }
+});
+
+// PUT /api/roadmap/source-links/:linkId (Edit Link)
+router.put(`${API_ROUTES.ROADMAP}/source-links/:linkId`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const linkId = parseInt(String(req.params.linkId), 10);
+    const { title, url, note } = req.body;
+
+    const existing = db.prepare('SELECT * FROM roadmap_source_links WHERE id = ?').get(linkId) as {
+      id: number;
+      title: string;
+      url: string;
+      note: string | null;
+    } | undefined;
+
+    if (!existing) {
+      res.status(404).json({ message: 'Source link not found' });
+      return;
+    }
+
+    const newTitle = title !== undefined ? title.trim() : existing.title;
+    const newUrl = url !== undefined ? url.trim() : existing.url;
+    const newNote = note !== undefined ? (note ? note.trim() : null) : existing.note;
+
+    if (!newTitle) {
+      res.status(400).json({ message: 'Title cannot be empty' });
+      return;
+    }
+
+    if (!newUrl || !isValidHttpUrl(newUrl)) {
+      res.status(400).json({ message: 'Invalid URL. Must start with http:// or https://' });
+      return;
+    }
+
+    db.prepare(`
+      UPDATE roadmap_source_links
+      SET title = ?, url = ?, note = ?
+      WHERE id = ?
+    `).run(newTitle, newUrl, newNote, linkId);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'source_crud',
+    });
+
+    res.json({ message: 'Source link updated successfully' });
+  } catch (err: unknown) {
+    console.error('Error updating source link:', err);
+    res.status(500).json({ message: 'Failed to update source link' });
+  }
+});
+
+// DELETE /api/roadmap/source-links/:linkId
+router.delete(`${API_ROUTES.ROADMAP}/source-links/:linkId`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const linkId = parseInt(String(req.params.linkId), 10);
+
+    const existing = db.prepare('SELECT id FROM roadmap_source_links WHERE id = ?').get(linkId);
+    if (!existing) {
+      res.status(404).json({ message: 'Source link not found' });
+      return;
+    }
+
+    db.prepare('DELETE FROM roadmap_source_links WHERE id = ?').run(linkId);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'source_crud',
+    });
+
+    res.json({ message: 'Source link deleted successfully', linkId });
+  } catch (err: unknown) {
+    console.error('Error deleting source link:', err);
+    res.status(500).json({ message: 'Failed to delete source link' });
+  }
+});
+
+// DELETE /api/roadmap/sources/:sourceId
+router.delete(`${API_ROUTES.ROADMAP_SOURCES}/:sourceId`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const sourceId = parseInt(String(req.params.sourceId), 10);
+
+    const existing = db.prepare('SELECT id FROM roadmap_sources WHERE id = ?').get(sourceId);
+    if (!existing) {
+      res.status(404).json({ message: 'Source group not found' });
+      return;
+    }
+
+    const deleteTransaction = db.transaction(() => {
+      db.prepare('DELETE FROM roadmap_source_links WHERE source_id = ?').run(sourceId);
+      db.prepare('DELETE FROM roadmap_sources WHERE id = ?').run(sourceId);
+    });
+
+    deleteTransaction();
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'source_crud',
+    });
+
+    res.json({ message: 'Source group deleted successfully', sourceId });
+  } catch (err: unknown) {
+    console.error('Error deleting source group:', err);
+    res.status(500).json({ message: 'Failed to delete source group' });
+  }
+});
+
 export default router;

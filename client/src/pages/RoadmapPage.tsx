@@ -12,10 +12,12 @@ import type {
   TaskCategory,
   UserProgressSummary,
   RoadmapUpdatedPayload,
+  RoadmapSource,
+  RoadmapSourceLink,
 } from '@streaktrack/shared';
 import { getApiUrl } from '../utils/api.js';
 
-type TabView = 'journey' | 'DSA' | 'LeetCode' | 'Python' | 'System Design' | 'AI Engineer';
+type TabView = 'journey' | 'sources' | 'DSA' | 'LeetCode' | 'Python' | 'System Design' | 'AI Engineer';
 
 const CATEGORIES: TaskCategory[] = ['DSA', 'LeetCode', 'Python', 'System Design', 'AI Engineer'];
 
@@ -33,6 +35,7 @@ export const RoadmapPage: React.FC = () => {
   const shouldReduceMotion = useReducedMotion();
 
   const [roadmapData, setRoadmapData] = useState<Month1RoadmapResponse | null>(null);
+  const [sourcesData, setSourcesData] = useState<RoadmapSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabView>('journey');
   const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = All
@@ -56,6 +59,25 @@ export const RoadmapPage: React.FC = () => {
   const [sessionNotes, setSessionNotes] = useState('');
   const [savingSession, setSavingSession] = useState(false);
 
+  // Source Vault Modal States
+  const [sourceGroupModalOpen, setSourceGroupModalOpen] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [editingLink, setEditingLink] = useState<RoadmapSourceLink | null>(null);
+  const [selectedSourceIdForLink, setSelectedSourceIdForLink] = useState<number | null>(null);
+  const [deletingLinkId, setDeletingLinkId] = useState<number | null>(null);
+  const [deletingSourceId, setDeletingSourceId] = useState<number | null>(null);
+
+  // Form states for Source Group
+  const [sourceGroupCategory, setSourceGroupCategory] = useState<TaskCategory>('DSA');
+  const [sourceGroupName, setSourceGroupName] = useState('');
+  const [isSubmittingSourceGroup, setIsSubmittingSourceGroup] = useState(false);
+
+  // Form states for Source Link
+  const [linkTitle, setLinkTitle] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkNote, setLinkNote] = useState('');
+  const [isSubmittingLink, setIsSubmittingLink] = useState(false);
+
   // Fetch Month 1 Roadmap Data
   const fetchRoadmap = useCallback(async () => {
     try {
@@ -72,21 +94,36 @@ export const RoadmapPage: React.FC = () => {
     }
   }, []);
 
+  // Fetch Sources Vault Data
+  const fetchSources = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_SOURCES), { credentials: 'include' });
+      if (res.ok) {
+        const data: RoadmapSource[] = await res.json();
+        setSourcesData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load sources', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRoadmap();
-  }, [fetchRoadmap]);
+    fetchSources();
+  }, [fetchRoadmap, fetchSources]);
 
   // Listen for Socket.io real-time updates
   useEffect(() => {
     if (!socket) return;
     const handleUpdated = (_payload: RoadmapUpdatedPayload) => {
       fetchRoadmap();
+      fetchSources();
     };
     socket.on(SOCKET_EVENTS.ROADMAP_UPDATED, handleUpdated);
     return () => {
       socket.off(SOCKET_EVENTS.ROADMAP_UPDATED, handleUpdated);
     };
-  }, [socket, fetchRoadmap]);
+  }, [socket, fetchRoadmap, fetchSources]);
 
   // Task Progress Toggle
   const handleToggleTask = async (taskId: number, currentCompleted: boolean) => {
@@ -153,7 +190,7 @@ export const RoadmapPage: React.FC = () => {
     }
   };
 
-  // Open Create / Edit Modal
+  // Open Create / Edit Task Modal
   const openCreateTaskModal = (defaultDay?: number, defaultCat?: TaskCategory) => {
     setEditingTask(null);
     setFormDay(defaultDay || 1);
@@ -245,6 +282,147 @@ export const RoadmapPage: React.FC = () => {
     }
   };
 
+  // ── Source Vault Handlers ─────────────────────────────────────
+  const handleCreateSourceGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sourceGroupName.trim()) {
+      toast.error('Source group name is required.');
+      return;
+    }
+
+    try {
+      setIsSubmittingSourceGroup(true);
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_SOURCES), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: sourceGroupCategory, name: sourceGroupName.trim() }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to create source group' }));
+        throw new Error(err.message || 'Failed to create source group');
+      }
+
+      toast.success('Source group added to vault! 📚');
+      setSourceGroupModalOpen(false);
+      setSourceGroupName('');
+      fetchSources();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create source group');
+    } finally {
+      setIsSubmittingSourceGroup(false);
+    }
+  };
+
+  const openAddLinkModal = (sourceId: number) => {
+    setSelectedSourceIdForLink(sourceId);
+    setEditingLink(null);
+    setLinkTitle('');
+    setLinkUrl('');
+    setLinkNote('');
+    setLinkModalOpen(true);
+  };
+
+  const openEditLinkModal = (link: RoadmapSourceLink) => {
+    setSelectedSourceIdForLink(link.sourceId);
+    setEditingLink(link);
+    setLinkTitle(link.title);
+    setLinkUrl(link.url);
+    setLinkNote(link.note || '');
+    setLinkModalOpen(true);
+  };
+
+  const handleSubmitLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkTitle.trim()) {
+      toast.error('Link title is required.');
+      return;
+    }
+
+    const trimmedUrl = linkUrl.trim();
+    if (!trimmedUrl || (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://'))) {
+      toast.error('Invalid URL. Link must start with http:// or https://');
+      return;
+    }
+
+    try {
+      setIsSubmittingLink(true);
+      let res: Response;
+
+      if (editingLink) {
+        res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP}/source-links/${editingLink.id}`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: linkTitle.trim(),
+            url: trimmedUrl,
+            note: linkNote.trim() || undefined,
+          }),
+          credentials: 'include',
+        });
+      } else if (selectedSourceIdForLink) {
+        res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP_SOURCES}/${selectedSourceIdForLink}/links`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: linkTitle.trim(),
+            url: trimmedUrl,
+            note: linkNote.trim() || undefined,
+          }),
+          credentials: 'include',
+        });
+      } else {
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to save link' }));
+        throw new Error(err.message || 'Failed to save link');
+      }
+
+      toast.success(editingLink ? 'Link updated! ✏️' : 'Resource link added to vault! 🔗');
+      setLinkModalOpen(false);
+      fetchSources();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save link');
+    } finally {
+      setIsSubmittingLink(false);
+    }
+  };
+
+  const handleDeleteLink = async () => {
+    if (!deletingLinkId) return;
+    try {
+      const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP}/source-links/${deletingLinkId}`), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete link');
+      toast.success('Link removed from source vault');
+      setDeletingLinkId(null);
+      fetchSources();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete link');
+    }
+  };
+
+  const handleDeleteSourceGroup = async () => {
+    if (!deletingSourceId) return;
+    try {
+      const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP_SOURCES}/${deletingSourceId}`), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete source group');
+      toast.success('Source group removed');
+      setDeletingSourceId(null);
+      fetchSources();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete source group');
+    }
+  };
+
   // Filtered Days
   const filteredDays = useMemo(() => {
     const days = roadmapData?.days || [];
@@ -260,7 +438,7 @@ export const RoadmapPage: React.FC = () => {
 
   // Group tasks for Category Views
   const categoryTasksByDay = useMemo(() => {
-    if (!roadmapData || activeTab === 'journey') return [];
+    if (!roadmapData || activeTab === 'journey' || activeTab === 'sources') return [];
     const category = activeTab as TaskCategory;
     const dayMap = new Map<number, { dayNumber: number; weekNumber: number; tasks: RoadmapTask[]; isUnlocked: boolean }>();
 
@@ -278,6 +456,21 @@ export const RoadmapPage: React.FC = () => {
 
     return Array.from(dayMap.values()).sort((a, b) => a.dayNumber - b.dayNumber);
   }, [roadmapData, activeTab]);
+
+  // Group sources by category for Sources Vault view
+  const sourcesByCategory = useMemo(() => {
+    const map = new Map<TaskCategory, RoadmapSource[]>();
+    for (const cat of CATEGORIES) {
+      map.set(cat, []);
+    }
+    for (const s of sourcesData) {
+      if (!map.has(s.category)) {
+        map.set(s.category, []);
+      }
+      map.get(s.category)!.push(s);
+    }
+    return map;
+  }, [sourcesData]);
 
   const myProgress = roadmapData?.myProgress;
   const partnerProgress = roadmapData?.partnerProgress;
@@ -318,7 +511,7 @@ export const RoadmapPage: React.FC = () => {
                 Roadmap Command Centre ⚡
               </h1>
               <p className="mt-1.5 text-xs sm:text-sm text-slate-400 max-w-2xl font-medium leading-relaxed">
-                Track concepts, LeetCode problems, Python internals, System Design and AI Engineering side-by-side with your study partner.
+                Track concepts, LeetCode problems, Python internals, System Design, AI Engineering, and shared source materials side-by-side with your study partner.
               </p>
             </div>
 
@@ -485,6 +678,17 @@ export const RoadmapPage: React.FC = () => {
             🗺️ 30-Day Journey
           </button>
 
+          <button
+            onClick={() => setActiveTab('sources')}
+            className={`btn-press cursor-pointer rounded-2xl px-4 py-2.5 text-xs font-extrabold transition-all whitespace-nowrap ${
+              activeTab === 'sources'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            📚 Sources Vault
+          </button>
+
           {CATEGORIES.map((cat) => {
             const badge = CATEGORY_BADGES[cat];
             const isActive = activeTab === cat;
@@ -505,13 +709,23 @@ export const RoadmapPage: React.FC = () => {
           })}
         </nav>
 
-        <button
-          onClick={() => openCreateTaskModal()}
-          className="btn-press cursor-pointer rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs px-4 py-2.5 border border-slate-700 transition-all flex items-center gap-1.5 shrink-0"
-        >
-          <span>➕</span>
-          <span>Add Task</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setSourceGroupModalOpen(true)}
+            className="btn-press cursor-pointer rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-extrabold text-xs px-3.5 py-2.5 border border-amber-500/30 transition-all flex items-center gap-1.5"
+          >
+            <span>📚</span>
+            <span>Add Source Group</span>
+          </button>
+
+          <button
+            onClick={() => openCreateTaskModal()}
+            className="btn-press cursor-pointer rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs px-4 py-2.5 border border-slate-700 transition-all flex items-center gap-1.5"
+          >
+            <span>➕</span>
+            <span>Add Task</span>
+          </button>
+        </div>
       </div>
 
       {/* ── 1. 30-Day Journey View ──────────────────────────────────── */}
@@ -633,8 +847,150 @@ export const RoadmapPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── 2. Category Views (DSA, LeetCode, Python, System Design, AI Engineer) ── */}
-      {activeTab !== 'journey' && (
+      {/* ── 2. Shared Sources Vault View ─────────────────────────────── */}
+      {activeTab === 'sources' && (
+        <div className="space-y-8">
+          <div className="flex items-center justify-between bg-slate-900/80 p-5 rounded-2xl border border-slate-800">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">📚</span>
+              <div>
+                <h3 className="text-xl font-black text-white">Shared Resource Vault</h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  Curated YouTube tutorials, courses, and documentation preloaded for Surya & Gomathi
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSourceGroupModalOpen(true)}
+              className="btn-press cursor-pointer rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2.5 shadow-md flex items-center gap-1.5"
+            >
+              <span>➕</span>
+              <span>New Educator / Source Group</span>
+            </button>
+          </div>
+
+          {/* Sources Categorized Cards Grid */}
+          <div className="space-y-8">
+            {CATEGORIES.map((cat) => {
+              const badge = CATEGORY_BADGES[cat];
+              const sources = sourcesByCategory.get(cat) || [];
+
+              return (
+                <div key={cat} className="space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                    <span className="text-xl">{badge.icon}</span>
+                    <h4 className="text-lg font-black text-white">{cat} Sources</h4>
+                    <span className="text-xs font-bold text-slate-400">({sources.length} Groups)</span>
+                  </div>
+
+                  {sources.length === 0 ? (
+                    <div className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 text-center text-xs text-slate-500 font-medium">
+                      No sources added for {cat} yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {sources.map((source) => (
+                        <div
+                          key={source.id}
+                          className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-4 shadow-lg flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                              <div className="flex items-center gap-2">
+                                <span className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase border ${badge.bg} ${badge.text} ${badge.border}`}>
+                                  {source.category}
+                                </span>
+                                <h5 className="text-base font-black text-white">{source.name}</h5>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => openAddLinkModal(source.id)}
+                                  className="btn-press cursor-pointer rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 px-2.5 py-1 text-xs font-bold transition-all"
+                                >
+                                  + Link
+                                </button>
+                                <button
+                                  onClick={() => setDeletingSourceId(source.id)}
+                                  className="btn-press cursor-pointer rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/50 p-1 text-xs"
+                                  title="Delete Source Group"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Saved Links */}
+                            <div className="space-y-3">
+                              {source.links.length === 0 ? (
+                                <p className="text-xs text-slate-500 italic py-2">No links saved under {source.name} yet.</p>
+                              ) : (
+                                source.links.map((link) => (
+                                  <div
+                                    key={link.id}
+                                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-3.5 space-y-2 hover:border-slate-700 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <a
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs sm:text-sm font-bold text-teal-400 hover:underline flex items-center gap-1.5 leading-snug break-all"
+                                      >
+                                        <span>🔗</span>
+                                        <span>{link.title}</span>
+                                      </a>
+
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                          onClick={() => openEditLinkModal(link)}
+                                          className="p-1 text-xs text-slate-400 hover:text-white"
+                                          title="Edit Link"
+                                        >
+                                          ✏️
+                                        </button>
+                                        <button
+                                          onClick={() => setDeletingLinkId(link.id)}
+                                          className="p-1 text-xs text-rose-400 hover:text-rose-300"
+                                          title="Delete Link"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {link.note && (
+                                      <p className="text-xs text-slate-300 font-medium bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                                        💡 {link.note}
+                                      </p>
+                                    )}
+
+                                    <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-[10px] text-slate-400">
+                                      <div className="flex items-center gap-1.5">
+                                        <Avatar name={link.addedByName} src={link.addedByAvatar} size="sm" />
+                                        <span className="font-bold text-slate-300">{link.addedByName}</span>
+                                      </div>
+                                      <span>{new Date(link.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. Category Views (DSA, LeetCode, Python, System Design, AI Engineer) ── */}
+      {activeTab !== 'journey' && activeTab !== 'sources' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
             <div className="flex items-center gap-3">
@@ -1023,6 +1379,156 @@ export const RoadmapPage: React.FC = () => {
         )}
       </AnimatePresence>
 
+      {/* ── Create Source Group Modal ───────────────────────────────── */}
+      <AnimatePresence>
+        {sourceGroupModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-white">Add New Source Group / Creator</h3>
+                <button
+                  onClick={() => setSourceGroupModalOpen(false)}
+                  className="cursor-pointer text-slate-400 hover:text-white font-bold text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateSourceGroup} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Category</label>
+                  <select
+                    value={sourceGroupCategory}
+                    onChange={(e) => setSourceGroupCategory(e.target.value as TaskCategory)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white focus:border-amber-500 outline-none"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Educator / Source Group Name</label>
+                  <input
+                    type="text"
+                    value={sourceGroupName}
+                    onChange={(e) => setSourceGroupName(e.target.value)}
+                    placeholder="e.g. Hitesh Choudhary"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white focus:border-amber-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSourceGroupModalOpen(false)}
+                    className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingSourceGroup}
+                    className="rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-5 py-2 shadow-md disabled:opacity-50"
+                  >
+                    {isSubmittingSourceGroup ? 'Creating...' : 'Add Source Group'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Create / Edit Source Link Modal ─────────────────────────── */}
+      <AnimatePresence>
+        {linkModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-white">
+                  {editingLink ? 'Edit Resource Link' : 'Add Resource Link'}
+                </h3>
+                <button
+                  onClick={() => setLinkModalOpen(false)}
+                  className="cursor-pointer text-slate-400 hover:text-white font-bold text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitLink} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Resource Title *</label>
+                  <input
+                    type="text"
+                    value={linkTitle}
+                    onChange={(e) => setLinkTitle(e.target.value)}
+                    placeholder="e.g. Striver's A2Z DSA Sheet / Playlist"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white focus:border-teal-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">URL (Must start with http:// or https://) *</label>
+                  <input
+                    type="url"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="https://youtube.com/playlist?list=..."
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white focus:border-teal-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Optional Note / Key Topics Covered</label>
+                  <textarea
+                    rows={2}
+                    value={linkNote}
+                    onChange={(e) => setLinkNote(e.target.value)}
+                    placeholder="e.g. Best for binary tree traversals and dynamic programming patterns"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-medium text-white focus:border-teal-500 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setLinkModalOpen(false)}
+                    className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingLink}
+                    className="rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs px-5 py-2 shadow-md disabled:opacity-50"
+                  >
+                    {isSubmittingLink ? 'Saving...' : editingLink ? 'Update Link' : 'Save Link to Vault'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ── Delete Task Confirmation Modal ─────────────────────────── */}
       <AnimatePresence>
         {deletingTaskId && (
@@ -1055,6 +1561,84 @@ export const RoadmapPage: React.FC = () => {
                   className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs px-5 py-2 shadow-md"
                 >
                   Delete Task
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Source Link Confirmation Modal ────────────────────── */}
+      <AnimatePresence>
+        {deletingLinkId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-3xl border border-rose-900/50 bg-slate-900 p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-400 text-xl border border-rose-500/30">
+                  ⚠️
+                </span>
+                <div>
+                  <h3 className="text-base font-black text-white">Delete Resource Link?</h3>
+                  <p className="text-xs text-slate-400 font-medium">This link will be removed from the shared source vault.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setDeletingLinkId(null)}
+                  className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteLink}
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs px-5 py-2 shadow-md"
+                >
+                  Delete Link
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Delete Source Group Confirmation Modal ───────────────────── */}
+      <AnimatePresence>
+        {deletingSourceId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm rounded-3xl border border-rose-900/50 bg-slate-900 p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-400 text-xl border border-rose-500/30">
+                  ⚠️
+                </span>
+                <div>
+                  <h3 className="text-base font-black text-white">Delete Source Group?</h3>
+                  <p className="text-xs text-slate-400 font-medium">This will remove this creator group and all nested links.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setDeletingSourceId(null)}
+                  className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteSourceGroup}
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs px-5 py-2 shadow-md"
+                >
+                  Delete Source Group
                 </button>
               </div>
             </motion.div>
