@@ -43,12 +43,8 @@ const allowedOrigins = CLIENT_URL.split(',').map((u) => u.trim());
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl) or if origin is in allowedOrigins
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow origin dynamically for easy deployment
-    }
+    // Return actual origin string to support credentials: 'include' cross-origin requests
+    callback(null, origin || true);
   },
   credentials: true,
 };
@@ -80,7 +76,7 @@ app.get(API_ROUTES.HEALTH, (_req, res) => {
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      callback(null, true); // Allow socket connection cross-origin
+      callback(null, origin || true);
     },
     methods: ['GET', 'POST'],
     credentials: true,
