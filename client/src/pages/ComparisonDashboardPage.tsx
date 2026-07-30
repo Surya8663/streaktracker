@@ -1,12 +1,29 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import type { StreakResponse, User, LogUpdatedPayload, MilestoneResponse } from '@streaktrack/shared';
+import type { StreakResponse, User, LogUpdatedPayload, MilestoneResponse, DailyLog } from '@streaktrack/shared';
 import { API_ROUTES, SOCKET_EVENTS } from '@streaktrack/shared';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { Avatar } from '../components/Avatar';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { useSocket } from '../context/SocketContext';
 import { getApiUrl } from '../utils/api.js';
+
+function formatRelativeTime(dateStr: string, createdAtStr?: string): string {
+  const targetDate = createdAtStr ? new Date(createdAtStr) : new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - targetDate.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (isNaN(targetDate.getTime())) return dateStr;
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'min' : 'mins'} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 function getPercentages(val1: number, val2: number) {
   const sum = val1 + val2;
@@ -95,6 +112,8 @@ export const ComparisonDashboardPage: React.FC = () => {
   const { socket, isOnline } = useSocket();
   const [streaks, setStreaks] = useState<StreakResponse[]>([]);
   const [milestoneData, setMilestoneData] = useState<MilestoneResponse | null>(null);
+  const [latestLogs, setLatestLogs] = useState<Record<number, DailyLog | null>>({});
+  const [flashUserIds, setFlashUserIds] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,13 +136,27 @@ export const ComparisonDashboardPage: React.FC = () => {
         setMilestoneData(mData);
       }
 
-      // Fetch streak for each user
+      // Fetch streak and latest log for each user in parallel
       const streakPromises = usersList.map((u) =>
         fetch(getApiUrl(`${API_ROUTES.STREAKS}/${u.id}`), { credentials: 'include' }).then((r) => r.json()),
       );
+      const logPromises = usersList.map((u) =>
+        fetch(getApiUrl(`${API_ROUTES.LOGS}/${u.id}`), { credentials: 'include' }).then((r) => r.json()),
+      );
 
-      const streakResults: StreakResponse[] = await Promise.all(streakPromises);
+      const [streakResults, logResults] = await Promise.all([
+        Promise.all(streakPromises),
+        Promise.all(logPromises),
+      ]);
+
       setStreaks(streakResults);
+
+      const logsMap: Record<number, DailyLog | null> = {};
+      usersList.forEach((u, idx) => {
+        const userLogs: DailyLog[] = logResults[idx]?.logs || [];
+        logsMap[u.id] = userLogs.length > 0 ? userLogs[0] : null;
+      });
+      setLatestLogs(logsMap);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -143,7 +176,9 @@ export const ComparisonDashboardPage: React.FC = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleLogUpdate = (_payload: LogUpdatedPayload) => {
+    const handleLogUpdate = (payload: LogUpdatedPayload) => {
+      setLatestLogs((prev) => ({ ...prev, [payload.userId]: payload.log }));
+      setFlashUserIds((prev) => ({ ...prev, [payload.userId]: Date.now() }));
       loadAllStreaks();
     };
 
@@ -408,6 +443,204 @@ export const ComparisonDashboardPage: React.FC = () => {
               </div>
             );
           })()}
+        </motion.div>
+      )}
+
+      {/* ── What We're Working On Section ────────────────────── */}
+      {suryaStreak && gomathiStreak && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-sm space-y-6"
+        >
+          {/* Section Header */}
+          <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📖</span>
+                <h3 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">
+                  What We're Working On
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Real-time snapshot of the latest daily study topics and notes
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-xs font-bold shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>Live Sync</span>
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Surya Card */}
+            {(() => {
+              const log = latestLogs[suryaStreak.user.id];
+              const flashKey = flashUserIds[suryaStreak.user.id] || 0;
+              return (
+                <motion.div
+                  key={`surya-log-${flashKey}`}
+                  initial={{ scale: 1 }}
+                  animate={{
+                    scale: flashKey ? [1, 1.02, 1] : 1,
+                    borderColor: flashKey ? ['#f59e0b', '#fde68a', '#e7e5e4'] : '#e7e5e4',
+                    backgroundColor: flashKey ? ['#fffbeb', '#ffffff'] : '#ffffff',
+                  }}
+                  transition={{ duration: 1.2, ease: 'easeOut' }}
+                  className="flex flex-col justify-between p-5 rounded-2xl border border-stone-200/80 bg-gradient-to-br from-amber-50/40 via-white to-stone-50 shadow-2xs relative overflow-hidden"
+                >
+                  <div>
+                    {/* Header: Avatar + Name + Timestamp */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          name={suryaStreak.user.name}
+                          src={suryaStreak.user.profilePicture}
+                          size="md"
+                          showStatus
+                          isOnline={isOnline(suryaStreak.user.id)}
+                        />
+                        <div>
+                          <h4 className="font-extrabold text-slate-800 text-sm">{suryaStreak.user.name}</h4>
+                          <span className="text-[11px] font-medium text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-md">
+                            Surya
+                          </span>
+                        </div>
+                      </div>
+
+                      {log && (
+                        <span className="text-xs font-semibold text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full border border-stone-200/60 shadow-2xs">
+                          🕒 {formatRelativeTime(log.date, log.createdAt)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Log Content */}
+                    {log ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Topics Studied
+                          </p>
+                          <p className="text-sm font-bold text-slate-800 leading-snug">
+                            {log.topicsStudied}
+                          </p>
+                        </div>
+
+                        {log.notes && (
+                          <div className="bg-amber-50/70 rounded-xl p-3 border border-amber-200/60 text-xs text-amber-950 font-medium">
+                            <span className="font-bold text-amber-900 block mb-0.5">📌 Notes</span>
+                            {log.notes}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-xs text-stone-400 italic">
+                        No daily logs recorded yet.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer: Hours Spent */}
+                  {log && (
+                    <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-bold">
+                      <span className="text-stone-500">Duration</span>
+                      <span className="text-amber-800 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-200/60">
+                        ⏱️ {log.hoursSpent} hrs logged
+                      </span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
+
+            {/* Gomathi Card */}
+            {(() => {
+              const log = latestLogs[gomathiStreak.user.id];
+              const flashKey = flashUserIds[gomathiStreak.user.id] || 0;
+              return (
+                <motion.div
+                  key={`gomathi-log-${flashKey}`}
+                  initial={{ scale: 1 }}
+                  animate={{
+                    scale: flashKey ? [1, 1.02, 1] : 1,
+                    borderColor: flashKey ? ['#10b981', '#a7f3d0', '#e7e5e4'] : '#e7e5e4',
+                    backgroundColor: flashKey ? ['#ecfdf5', '#ffffff'] : '#ffffff',
+                  }}
+                  transition={{ duration: 1.2, ease: 'easeOut' }}
+                  className="flex flex-col justify-between p-5 rounded-2xl border border-stone-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-stone-50 shadow-2xs relative overflow-hidden"
+                >
+                  <div>
+                    {/* Header: Avatar + Name + Timestamp */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          name={gomathiStreak.user.name}
+                          src={gomathiStreak.user.profilePicture}
+                          size="md"
+                          showStatus
+                          isOnline={isOnline(gomathiStreak.user.id)}
+                        />
+                        <div>
+                          <h4 className="font-extrabold text-slate-800 text-sm">{gomathiStreak.user.name}</h4>
+                          <span className="text-[11px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                            Gomathi
+                          </span>
+                        </div>
+                      </div>
+
+                      {log && (
+                        <span className="text-xs font-semibold text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full border border-stone-200/60 shadow-2xs">
+                          🕒 {formatRelativeTime(log.date, log.createdAt)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Log Content */}
+                    {log ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Topics Studied
+                          </p>
+                          <p className="text-sm font-bold text-slate-800 leading-snug">
+                            {log.topicsStudied}
+                          </p>
+                        </div>
+
+                        {log.notes && (
+                          <div className="bg-emerald-50/70 rounded-xl p-3 border border-emerald-200/60 text-xs text-emerald-950 font-medium">
+                            <span className="font-bold text-emerald-900 block mb-0.5">📌 Notes</span>
+                            {log.notes}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-xs text-stone-400 italic">
+                        No daily logs recorded yet.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer: Hours Spent */}
+                  {log && (
+                    <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-bold">
+                      <span className="text-stone-500">Duration</span>
+                      <span className="text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-full border border-emerald-200/60">
+                        ⏱️ {log.hoursSpent} hrs logged
+                      </span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
+          </div>
         </motion.div>
       )}
 
