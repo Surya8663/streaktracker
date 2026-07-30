@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Avatar } from '../components/Avatar';
-import { DailyLogForm } from '../components/DailyLogForm';
+import { TodaysMissionCard } from '../components/TodaysMissionCard';
 import { RecentLogsList } from '../components/RecentLogsList';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { TreatBadge } from '../components/TreatBadge';
@@ -14,7 +14,7 @@ import { MilestonesPage } from './MilestonesPage';
 import { RoadmapPage } from './RoadmapPage';
 import { ProfilePage } from './ProfilePage';
 import { APP_NAME, SOCKET_EVENTS, API_ROUTES } from '@streaktrack/shared';
-import type { DailyLog, StreakResponse, LogUpdatedPayload, MilestoneResponse } from '@streaktrack/shared';
+import type { DailyLog, StreakResponse, LogUpdatedPayload, MilestoneResponse, Month1RoadmapResponse, RoadmapUpdatedPayload } from '@streaktrack/shared';
 import { getApiUrl } from '../utils/api.js';
 
 function getTodayString(): string {
@@ -56,7 +56,25 @@ export const HomePage: React.FC = () => {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [personalStreak, setPersonalStreak] = useState<StreakResponse | null>(null);
   const [milestoneData, setMilestoneData] = useState<MilestoneResponse | null>(null);
+  const [roadmapData, setRoadmapData] = useState<Month1RoadmapResponse | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(true);
+  const [loadingRoadmap, setLoadingRoadmap] = useState(true);
+
+  // Fetch Month 1 Roadmap data
+  const fetchRoadmapData = useCallback(async () => {
+    try {
+      setLoadingRoadmap(true);
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_MONTH1), { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setRoadmapData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch roadmap data', err);
+    } finally {
+      setLoadingRoadmap(false);
+    }
+  }, []);
 
   // Fetch initial user data
   const fetchUserData = useCallback(async () => {
@@ -117,9 +135,10 @@ export const HomePage: React.FC = () => {
 
   useEffect(() => {
     fetchUserData();
-  }, [fetchUserData]);
+    fetchRoadmapData();
+  }, [fetchUserData, fetchRoadmapData]);
 
-  // Optimized socket event handlers (update state locally & fetch targeted resource)
+  // Optimized socket event handlers
   useEffect(() => {
     if (!socket) return;
 
@@ -142,29 +161,59 @@ export const HomePage: React.FC = () => {
       fetchMilestonesOnly();
     };
 
+    const handleRoadmapUpdated = (_payload: RoadmapUpdatedPayload) => {
+      fetchRoadmapData();
+    };
+
     socket.on(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
     socket.on(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
+    socket.on(SOCKET_EVENTS.ROADMAP_UPDATED, handleRoadmapUpdated);
 
     return () => {
       socket.off(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
       socket.off(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
+      socket.off(SOCKET_EVENTS.ROADMAP_UPDATED, handleRoadmapUpdated);
     };
-  }, [socket, user, fetchStreakOnly, fetchMilestonesOnly]);
+  }, [socket, user, fetchStreakOnly, fetchMilestonesOnly, fetchRoadmapData]);
 
-  const todayStr = getTodayString();
-  const todayLog = logs.find((l) => l.date === todayStr) || null;
-
-  const handleLogSaved = (savedLog: DailyLog) => {
-    setLogs((prev) => {
-      const existingIdx = prev.findIndex((l) => l.id === savedLog.id || l.date === savedLog.date);
-      if (existingIdx >= 0) {
-        const updated = [...prev];
-        updated[existingIdx] = savedLog;
-        return updated;
-      }
-      return [savedLog, ...prev];
+  const handleStartRoadmap = async () => {
+    const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP_MONTH1}/start`), {
+      method: 'POST',
+      credentials: 'include',
     });
-    fetchStreakOnly();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to start roadmap' }));
+      throw new Error(err.message || 'Failed to start roadmap');
+    }
+    await fetchRoadmapData();
+  };
+
+  const handleTaskToggle = async (taskId: number, isCompleted: boolean) => {
+    const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP_TASKS}/${taskId}/progress`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isCompleted }),
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to toggle task' }));
+      throw new Error(err.message || 'Failed to toggle task');
+    }
+    await fetchRoadmapData();
+  };
+
+  const handleSaveDay = async (dayNumber: number, minutesStudied: number, notes?: string) => {
+    const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP_MONTH1}/days/${dayNumber}/save`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutesStudied, notes }),
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to save roadmap day' }));
+      throw new Error(err.message || 'Failed to save roadmap day');
+    }
+    await Promise.all([fetchRoadmapData(), fetchUserData()]);
   };
 
   const switchTab = (tab: Tab) => {
@@ -189,103 +238,123 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800">
-      {/* ═══ Top Navigation Bar (Single Sticky Blur Header) ═══ */}
-      <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 font-bold text-white shadow-sm text-sm">
-              ST
-            </div>
-            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
-              {APP_NAME}
-            </span>
-          </div>
-
-          {/* Desktop Tab Navigation */}
-          <nav className="hidden md:flex items-center rounded-2xl bg-stone-100/80 p-1 border border-stone-200/60">
-            {TAB_CONFIG.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => switchTab(tab.id)}
-                className={`btn-press cursor-pointer rounded-xl px-3 lg:px-4 py-1.5 text-xs font-semibold transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-white text-teal-700 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <span className="mr-1">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Right: User + Mobile Menu */}
-          <div className="flex items-center gap-3">
-            {/* User Avatar (clickable → profile) */}
-            <div
-              className="hidden sm:flex items-center gap-2 cursor-pointer rounded-xl p-1.5 hover:bg-stone-100 transition-colors"
-              onClick={() => switchTab('profile')}
-              title="View Profile"
-            >
-              <Avatar name={user?.name || ''} src={user?.profilePicture} size="sm" showStatus isOnline={userIsOnline} />
-              <div className="hidden lg:block text-left">
-                <p className="text-xs font-semibold text-slate-900 leading-tight">{user?.name}</p>
-                <p className="text-[10px] text-slate-500">{user?.email}</p>
+      {/* ── Fixed Glass Header ───────────────────────────────────── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo Mark */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-teal-500 font-extrabold text-white text-xl shadow-xs">
+                🔥
               </div>
+              <span className="text-xl font-extrabold tracking-tight text-slate-900">
+                {APP_NAME}
+              </span>
             </div>
 
-            <button
-              onClick={() => logout()}
-              className="btn-press cursor-pointer rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-xs hover:bg-stone-50 hover:text-slate-900 transition-colors"
-            >
-              Sign Out
-            </button>
-
-            {/* Mobile Hamburger */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden cursor-pointer rounded-xl border border-stone-200 bg-white p-2 text-sm shadow-xs hover:bg-stone-50"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? '✕' : '☰'}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Nav Dropdown */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.nav
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="md:hidden overflow-hidden border-t border-stone-200/60 bg-white"
-            >
-              <div className="px-4 py-3 space-y-1">
-                {TAB_CONFIG.map((tab) => (
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-1.5 bg-stone-100/80 p-1.5 rounded-2xl border border-stone-200/60">
+              {TAB_CONFIG.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
-                    className={`btn-press cursor-pointer w-full rounded-xl px-4 py-2.5 text-left text-sm font-semibold transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                        : 'text-slate-600 hover:bg-stone-50'
+                    className={`btn-press cursor-pointer relative px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      isActive
+                        ? 'text-slate-900 bg-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-stone-200/50'
                     }`}
                   >
-                    <span className="mr-2">{tab.icon}</span>
-                    {tab.label}
+                    <span className="flex items-center gap-1.5">
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </span>
                   </button>
-                ))}
+                );
+              })}
+            </nav>
+
+            {/* User Profile & Logout */}
+            <div className="hidden md:flex items-center gap-3">
+              {user && (
+                <div className="flex items-center gap-2.5 bg-stone-100/80 pl-2.5 pr-3.5 py-1.5 rounded-2xl border border-stone-200/60">
+                  <Avatar name={user.name} src={user.profilePicture} size="sm" showStatus isOnline={userIsOnline} />
+                  <span className="text-xs font-extrabold text-slate-800">{user.name}</span>
+                </div>
+              )}
+
+              <button
+                onClick={logout}
+                className="btn-press cursor-pointer rounded-xl border border-stone-200/80 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-2xs hover:bg-stone-100 hover:text-rose-600 transition-all"
+              >
+                Logout 🚪
+              </button>
+            </div>
+
+            {/* Mobile Hamburger Menu Button */}
+            <div className="flex md:hidden items-center gap-2">
+              {user && <Avatar name={user.name} src={user.profilePicture} size="sm" showStatus isOnline={userIsOnline} />}
+
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="btn-press cursor-pointer rounded-xl border border-stone-200 bg-white p-2 text-slate-700 shadow-2xs"
+                aria-label="Toggle navigation menu"
+              >
+                <svg className="w-6 h-6 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  {mobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="md:hidden border-b border-stone-200 bg-white px-4 pt-2 pb-4 space-y-2 overflow-hidden"
+            >
+              {TAB_CONFIG.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => switchTab(tab.id)}
+                    className={`btn-press cursor-pointer w-full flex items-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-bold text-left transition-colors ${
+                      isActive ? 'bg-teal-50 text-teal-900 border border-teal-200' : 'text-slate-700 hover:bg-stone-100'
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+
+              <div className="pt-2 border-t border-stone-100">
+                <button
+                  onClick={logout}
+                  className="btn-press cursor-pointer w-full text-left px-4 py-3 rounded-2xl text-sm font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 transition-colors flex items-center gap-2"
+                >
+                  <span>🚪</span>
+                  <span>Logout</span>
+                </button>
               </div>
-            </motion.nav>
+            </motion.div>
           )}
         </AnimatePresence>
       </header>
 
-      {/* ═══ Main Content with Fast Single-Fade Page Transitions ═══ */}
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
+      {/* ── Main Content Container ─────────────────────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AnimatePresence mode="wait">
           {activeTab === 'log' && (
             <motion.div
@@ -295,79 +364,71 @@ export const HomePage: React.FC = () => {
               animate="animate"
               exit="exit"
               transition={pageTransition}
-              className="space-y-6 sm:space-y-8"
+              className="space-y-8"
             >
-              {/* Profile Welcome Banner (Gamified Energy Header) */}
-              <div className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-emerald-500/10 p-6 sm:p-7 shadow-xs border-t-3 border-t-amber-500">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
-                  <div className="flex items-center gap-4 sm:gap-5 cursor-pointer" onClick={() => switchTab('profile')}>
-                    <Avatar name={user?.name || ''} src={user?.profilePicture} size="xl" showStatus isOnline={userIsOnline} />
-                    <div>
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="rounded-full bg-amber-500/20 text-amber-950 text-[11px] font-black px-2.5 py-0.5 border border-amber-300/60 shadow-2xs">
-                          🔥 Streak Warrior
-                        </span>
-                        <span className="rounded-full bg-emerald-500/15 text-emerald-900 text-[11px] font-extrabold px-2.5 py-0.5 border border-emerald-300/50">
-                          Leveling Up
-                        </span>
-                      </div>
-                      <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        Welcome back, {user?.name}! 👋
-                      </h1>
-                      <p className="mt-0.5 text-xs sm:text-sm text-slate-600 font-medium">
-                        Track your daily study progress and keep your momentum burning.
-                      </p>
+              {/* Gamified Welcome Banner */}
+              <div className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 p-6 sm:p-8 text-white shadow-sm border-t-3 border-t-amber-400">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-black text-amber-200 border border-white/20">
+                        🔥 Streak Warrior
+                      </span>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-teal-100">
+                        Leveling Up Daily
+                      </span>
                     </div>
+                    <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                      Welcome back, {user?.name || 'Warrior'}! 💪
+                    </h1>
+                    <p className="mt-1.5 text-xs sm:text-sm text-teal-100 max-w-xl font-medium leading-relaxed">
+                      Complete today's concepts and problems to advance your Month 1 AI Engineer Roadmap and keep your streak alive!
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold shadow-2xs">
-                    <span
-                      className={`inline-block h-2.5 w-2.5 rounded-full ${
-                        socket?.connected
-                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
-                          : 'bg-slate-400'
-                      }`}
-                    />
-                    <span className="text-slate-700 font-bold">
-                      {socket?.connected ? `${user?.name} (Online)` : 'Connecting...'}
-                    </span>
-                  </div>
+                  {user && (
+                    <div className="flex items-center gap-3 bg-white/15 p-3.5 rounded-2xl border border-white/20 shadow-2xs shrink-0">
+                      <Avatar name={user.name} src={user.profilePicture} size="md" showStatus isOnline={userIsOnline} />
+                      <div>
+                        <p className="text-xs font-black text-white">{user.name}</p>
+                        <p className="text-[10px] text-teal-100 font-semibold">{user.email}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Hero XP Stats Strip (4 Bold Achievement Cards) */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Current Streak Card (Hero Vivid Flame Gradient) */}
-                <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 text-white p-4 sm:p-5 shadow-md border border-amber-400/40 hover:scale-[1.02] transition-all cursor-pointer relative overflow-hidden group">
+              {/* ── Hero XP Stats Strip (4 Bold Cards) ─────────────────── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                {/* 1. Current Streak Card */}
+                <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-4 sm:p-5 text-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">🔥</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full backdrop-blur-2xs">
-                      Current
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded-full">
+                      Active
                     </span>
                   </div>
-                  <p className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-xs">
-                    <AnimatedCounter value={currentStreak} />
+                  <p className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    <AnimatedCounter value={currentStreak} suffix=" days" />
                   </p>
-                  <p className="text-xs font-bold text-amber-100/90 mt-0.5">
-                    {currentStreak === 1 ? 'Day Streak' : 'Days Streak'}
-                  </p>
+                  <p className="text-xs font-bold text-amber-100 mt-0.5">Current Streak</p>
                 </div>
 
                 {/* 2. Total Hours Card */}
-                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-emerald-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
+                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-teal-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">⏱️</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                      All-Time
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-100/80 px-2 py-0.5 rounded-full">
+                      All-time
                     </span>
                   </div>
                   <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    <AnimatedCounter value={totalHours} decimals={1} />
+                    <AnimatedCounter value={totalHours} decimals={1} suffix=" hrs" />
                   </p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">Total Hours Logged</p>
                 </div>
 
-                {/* 3. Longest Streak Card */}
+                {/* 3. Best Streak Record Card */}
                 <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-amber-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">⚡</span>
@@ -376,34 +437,39 @@ export const HomePage: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    <AnimatedCounter value={longestStreak} />
+                    <AnimatedCounter value={longestStreak} suffix=" days" />
                   </p>
                   <p className="text-xs font-semibold text-slate-500 mt-0.5">Best Streak Record</p>
                 </div>
 
                 {/* 4. Active Days Card */}
-                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-teal-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
+                <div className="rounded-2xl bg-white p-4 sm:p-5 border border-stone-200/80 border-t-3 border-t-emerald-500 shadow-2xs hover:shadow-md hover:scale-[1.01] transition-all group">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl sm:text-3xl group-hover:scale-110 transition-transform">🎯</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 bg-teal-100/80 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">
                       Consistency
                     </span>
                   </div>
                   <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                    <AnimatedCounter value={daysActive} />
+                    <AnimatedCounter value={daysActive} suffix=" days" />
                   </p>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Days Active</p>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Total Days Active</p>
                 </div>
               </div>
 
               {/* Dynamic 2-Column Grid on Desktop (lg:grid lg:grid-cols-12 lg:gap-8) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* ── Left Column (8 cols): Daily Log Form & Recent Entries ── */}
+                {/* ── Left Column (8 cols): Today's Mission Card & Recent Entries ── */}
                 <div className="lg:col-span-8 space-y-8">
-                  {/* Daily Log Form */}
-                  <section className="rounded-3xl border border-stone-200/80 bg-white shadow-2xs border-t-3 border-t-teal-500 overflow-hidden">
-                    <DailyLogForm todayLog={todayLog} onLogSaved={handleLogSaved} />
-                  </section>
+                  {/* Today's Mission Card (Roadmap Driven) */}
+                  <TodaysMissionCard
+                    roadmapData={roadmapData}
+                    loading={loadingRoadmap}
+                    onStartRoadmap={handleStartRoadmap}
+                    onTaskToggle={handleTaskToggle}
+                    onSaveDay={handleSaveDay}
+                    onOpenRoadmap={() => switchTab('roadmap')}
+                  />
 
                   {/* Recent Logs List with Pulse Skeleton Loader */}
                   <section>
