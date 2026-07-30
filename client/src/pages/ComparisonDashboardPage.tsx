@@ -111,6 +111,30 @@ const StatRow: React.FC<StatRowProps> = ({ title, icon, val1, val2, unit = '', d
   );
 };
 
+// Motion container variants for staggered entrance
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.45,
+      ease: 'easeOut',
+    },
+  },
+};
+
 export const ComparisonDashboardPage: React.FC = () => {
   const { socket, isOnline } = useSocket();
   const [streaks, setStreaks] = useState<StreakResponse[]>([]);
@@ -221,7 +245,7 @@ export const ComparisonDashboardPage: React.FC = () => {
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-3 border-teal-500 border-t-transparent" />
-          <p className="text-sm font-medium text-slate-500">Loading streak calendars...</p>
+          <p className="text-sm font-medium text-slate-500">Loading Common Area...</p>
         </div>
       </div>
     );
@@ -256,23 +280,26 @@ export const ComparisonDashboardPage: React.FC = () => {
   const isGomathiLeading = suryaStreak && gomathiStreak && gomathiStreak.currentStreak > suryaStreak.currentStreak;
 
   return (
-    <div className="space-y-8">
-      {/* ── Current Battle Banner ────────────────────────────── */}
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-8"
+    >
+      {/* ── 1. Current Battle Banner ─────────────────────────── */}
       {milestoneData?.currentBlock && (
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="rounded-3xl border border-amber-200/80 bg-gradient-to-r from-amber-500/10 via-amber-100/30 to-orange-50/60 p-6 sm:p-7 shadow-sm space-y-4 relative overflow-hidden"
+          variants={sectionVariants}
+          className="rounded-3xl border border-amber-200/80 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-stone-50 p-6 sm:p-7 shadow-sm space-y-4 relative overflow-hidden"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Block & Days Remaining */}
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="rounded-full bg-amber-400/30 text-amber-950 text-xs font-black px-3 py-0.5 border border-amber-300/50 shadow-2xs">
+                <span className="rounded-full bg-amber-200/60 text-amber-950 text-xs font-black px-3 py-0.5 border border-amber-300/60 shadow-2xs">
                   ⚔️ 5-Day Block #{milestoneData.currentBlock.blockNumber}
                 </span>
-                <span className="text-xs font-extrabold text-amber-900 bg-white/80 px-2.5 py-0.5 rounded-full border border-amber-200/60 shadow-2xs">
+                <span className="text-xs font-extrabold text-amber-900 bg-white/90 px-2.5 py-0.5 rounded-full border border-amber-200/70 shadow-2xs">
                   ⏳ {milestoneData.currentBlock.daysRemaining} {milestoneData.currentBlock.daysRemaining === 1 ? 'day' : 'days'} left
                 </span>
               </div>
@@ -309,7 +336,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                 const leadingHours = u1Hours > u2Hours ? u1Hours : u2Hours;
                 const trailingHours = u1Hours > u2Hours ? u2Hours : u1Hours;
                 const leadDiff = (leadingHours - trailingHours).toFixed(1);
-                const isSuryaLeading = u1Hours > u2Hours;
+                const isSuryaLeadingBlock = u1Hours > u2Hours;
 
                 return (
                   <div className="flex items-center gap-3">
@@ -323,7 +350,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          isSuryaLeading ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                          isSuryaLeadingBlock ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
                         }`}>
                           Leading Now 👑
                         </span>
@@ -338,7 +365,7 @@ export const ComparisonDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Treat Badges Section if either user owes a treat */}
+          {/* Treat Badges Section */}
           {milestoneData.treatScoreboard && milestoneData.treatScoreboard.some((t) => t.treatsOwed > 0) && (
             <div className="pt-3 border-t border-amber-200/50 grid grid-cols-1 md:grid-cols-2 gap-3">
               {milestoneData.treatScoreboard.map((t) => {
@@ -359,131 +386,122 @@ export const ComparisonDashboardPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* ── VS Hero Section ───────────────────────────────────── */}
+      {/* ── 2. VS Hero Section (Vertical Stack on Mobile) ─────── */}
       {suryaStreak && gomathiStreak && (
-        <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-2">
-          {/* Left Card: Surya */}
-          <motion.div
-            initial={{ opacity: 0, x: -60 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ type: 'spring', stiffness: 90, damping: 15 }}
-            className={`relative flex-1 w-full flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
-              isSuryaLeading
-                ? 'bg-gradient-to-br from-amber-500/15 via-amber-100/50 to-orange-50/90 border-amber-300/90 shadow-md ring-2 ring-amber-400/40'
-                : 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 border-stone-200/80 shadow-xs'
-            }`}
-          >
-            {/* Leading Crown Badge */}
-            {isSuryaLeading && (
-              <motion.div
-                initial={{ scale: 0, y: 10, rotate: -15 }}
-                animate={{ scale: 1, y: 0, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
-                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-amber-200 ring-2 ring-amber-300/50 z-10"
-              >
-                <span>👑</span> Leading
-              </motion.div>
-            )}
-
-            {/* Avatar Container with glowing ring if leading */}
-            <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
-              isSuryaLeading ? 'ring-4 ring-amber-400/80 shadow-lg shadow-amber-400/30' : ''
-            }`}>
-              <Avatar
-                name={suryaStreak.user.name}
-                src={suryaStreak.user.profilePicture}
-                size="xl"
-                showStatus
-                isOnline={isOnline(suryaStreak.user.id)}
-              />
-            </div>
-
-            {/* Name */}
-            <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
-              {suryaStreak.user.name}
-            </h3>
-
-            {/* Current Streak Counter */}
-            <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-amber-800 bg-amber-100/90 px-4 py-1 rounded-full border border-amber-200/80 shadow-xs">
-              <span className="text-base">🔥</span>
-              <AnimatedCounter value={suryaStreak.currentStreak} />
-              <span>{suryaStreak.currentStreak === 1 ? 'day' : 'days'}</span>
-            </div>
-          </motion.div>
-
-          {/* Center VS Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.35 }}
-            className="z-10 -my-3 sm:my-0 flex items-center justify-center shrink-0"
-          >
+        <motion.div variants={sectionVariants}>
+          <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-2">
+            {/* Left Card: Surya with hover 3D tilt */}
             <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-teal-500 text-white font-black text-lg flex items-center justify-center shadow-lg shadow-rose-500/30 ring-4 ring-white border border-white/50"
+              whileHover={{ scale: 1.025, y: -4, rotateY: -3 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
+              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+                isSuryaLeading
+                  ? 'bg-gradient-to-br from-amber-100/80 via-amber-50/60 to-stone-50 border-amber-300 shadow-md ring-2 ring-amber-400/40'
+                  : 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+              }`}
             >
-              VS
+              {/* Leading Crown Badge */}
+              {isSuryaLeading && (
+                <motion.div
+                  initial={{ scale: 0, y: 10, rotate: -15 }}
+                  animate={{ scale: 1, y: 0, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
+                  className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-amber-200 ring-2 ring-amber-300/50 z-10"
+                >
+                  <span>👑</span> Leading
+                </motion.div>
+              )}
+
+              {/* Avatar Container */}
+              <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
+                isSuryaLeading ? 'ring-4 ring-amber-400/80 shadow-lg shadow-amber-400/30' : ''
+              }`}>
+                <Avatar
+                  name={suryaStreak.user.name}
+                  src={suryaStreak.user.profilePicture}
+                  size="xl"
+                  showStatus
+                  isOnline={isOnline(suryaStreak.user.id)}
+                />
+              </div>
+
+              <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
+                {suryaStreak.user.name}
+              </h3>
+
+              <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-amber-800 bg-amber-100/90 px-4 py-1 rounded-full border border-amber-200/80 shadow-2xs">
+                <span className="text-base">🔥</span>
+                <AnimatedCounter value={suryaStreak.currentStreak} />
+                <span>{suryaStreak.currentStreak === 1 ? 'day' : 'days'}</span>
+              </div>
             </motion.div>
-          </motion.div>
 
-          {/* Right Card: Gomathi */}
-          <motion.div
-            initial={{ opacity: 0, x: 60 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ type: 'spring', stiffness: 90, damping: 15 }}
-            className={`relative flex-1 w-full flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
-              isGomathiLeading
-                ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-100/50 to-teal-50/90 border-emerald-300/90 shadow-md ring-2 ring-emerald-400/40'
-                : 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-stone-50 border-stone-200/80 shadow-xs'
-            }`}
-          >
-            {/* Leading Crown Badge */}
-            {isGomathiLeading && (
+            {/* Center VS Badge */}
+            <div className="z-10 -my-2 sm:my-0 flex items-center justify-center shrink-0">
               <motion.div
-                initial={{ scale: 0, y: 10, rotate: 15 }}
-                animate={{ scale: 1, y: 0, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
-                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-400 text-emerald-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-emerald-200 ring-2 ring-emerald-300/50 z-10"
+                animate={{ scale: [1, 1.06, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-teal-500 text-white font-black text-lg flex items-center justify-center shadow-md shadow-rose-500/30 ring-4 ring-white border border-white/60"
               >
-                <span>👑</span> Leading
+                VS
               </motion.div>
-            )}
-
-            {/* Avatar Container with glowing ring if leading */}
-            <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
-              isGomathiLeading ? 'ring-4 ring-emerald-400/80 shadow-lg shadow-emerald-400/30' : ''
-            }`}>
-              <Avatar
-                name={gomathiStreak.user.name}
-                src={gomathiStreak.user.profilePicture}
-                size="xl"
-                showStatus
-                isOnline={isOnline(gomathiStreak.user.id)}
-              />
             </div>
 
-            {/* Name */}
-            <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
-              {gomathiStreak.user.name}
-            </h3>
+            {/* Right Card: Gomathi with hover 3D tilt */}
+            <motion.div
+              whileHover={{ scale: 1.025, y: -4, rotateY: 3 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
+              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+                isGomathiLeading
+                  ? 'bg-gradient-to-br from-emerald-100/80 via-emerald-50/60 to-stone-50 border-emerald-300 shadow-md ring-2 ring-emerald-400/40'
+                  : 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+              }`}
+            >
+              {/* Leading Crown Badge */}
+              {isGomathiLeading && (
+                <motion.div
+                  initial={{ scale: 0, y: 10, rotate: 15 }}
+                  animate={{ scale: 1, y: 0, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
+                  className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-400 text-emerald-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-emerald-200 ring-2 ring-emerald-300/50 z-10"
+                >
+                  <span>👑</span> Leading
+                </motion.div>
+              )}
 
-            {/* Current Streak Counter */}
-            <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-emerald-800 bg-emerald-100/90 px-4 py-1 rounded-full border border-emerald-200/80 shadow-xs">
-              <span className="text-base">🔥</span>
-              <AnimatedCounter value={gomathiStreak.currentStreak} />
-              <span>{gomathiStreak.currentStreak === 1 ? 'day' : 'days'}</span>
-            </div>
-          </motion.div>
-        </div>
+              {/* Avatar Container */}
+              <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
+                isGomathiLeading ? 'ring-4 ring-emerald-400/80 shadow-lg shadow-emerald-400/30' : ''
+              }`}>
+                <Avatar
+                  name={gomathiStreak.user.name}
+                  src={gomathiStreak.user.profilePicture}
+                  size="xl"
+                  showStatus
+                  isOnline={isOnline(gomathiStreak.user.id)}
+                />
+              </div>
+
+              <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
+                {gomathiStreak.user.name}
+              </h3>
+
+              <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-emerald-800 bg-emerald-100/90 px-4 py-1 rounded-full border border-emerald-200/80 shadow-2xs">
+                <span className="text-base">🔥</span>
+                <AnimatedCounter value={gomathiStreak.currentStreak} />
+                <span>{gomathiStreak.currentStreak === 1 ? 'day' : 'days'}</span>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
       )}
 
-      {/* ── Head-to-Head Racing Stats ──────────────────────────── */}
+      {/* ── 3. Head-to-Head Racing Stats ──────────────────────── */}
       {suryaStreak && gomathiStreak && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
+          variants={sectionVariants}
           className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-sm space-y-6"
         >
           {/* Section Header */}
@@ -538,7 +556,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                   val2={gomathiStreak.totalHours}
                   unit="hrs"
                   decimals={1}
-                  delay={0.25}
+                  delay={0.2}
                 />
 
                 <StatRow
@@ -548,7 +566,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                   val2={gomathiStreak.currentStreak}
                   unit="days"
                   decimals={0}
-                  delay={0.35}
+                  delay={0.3}
                 />
 
                 <StatRow
@@ -558,7 +576,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                   val2={gomathiStreak.longestStreak}
                   unit="days"
                   decimals={0}
-                  delay={0.45}
+                  delay={0.4}
                 />
 
                 <StatRow
@@ -568,7 +586,7 @@ export const ComparisonDashboardPage: React.FC = () => {
                   val2={gomathiBlockHours}
                   unit="hrs"
                   decimals={1}
-                  delay={0.55}
+                  delay={0.5}
                 />
               </div>
             );
@@ -576,12 +594,10 @@ export const ComparisonDashboardPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* ── What We're Working On Section ────────────────────── */}
+      {/* ── 4. What We're Working On Section ──────────────────── */}
       {suryaStreak && gomathiStreak && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          variants={sectionVariants}
           className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-sm space-y-6"
         >
           {/* Section Header */}
@@ -774,46 +790,44 @@ export const ComparisonDashboardPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Comparison Overview Card */}
+      {/* ── 5. Light-Theme Comparison Overview Card ─────────── */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.3 }}
-        className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-6 sm:p-8 text-white shadow-lg"
+        variants={sectionVariants}
+        className="rounded-3xl border border-teal-200/80 bg-gradient-to-r from-teal-50/90 via-emerald-50/70 to-stone-50 p-6 sm:p-8 text-slate-800 shadow-xs"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
-            <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-teal-200 backdrop-blur-md mb-2 border border-white/10">
+            <span className="inline-block rounded-full bg-teal-100/90 text-teal-900 px-3 py-1 text-xs font-bold border border-teal-200/80 mb-2">
               📊 Side-by-Side Comparison
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Habit & Streak Leaderboard
             </h2>
-            <p className="mt-1 text-sm text-stone-300 max-w-lg">
+            <p className="mt-1 text-sm text-slate-600 max-w-lg">
               Visually comparing daily study activity and streaks between Surya and Gomathi over the last 6 months.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
             {/* Total Combined Team Hours */}
-            <div className="rounded-2xl bg-white/10 px-5 py-3 backdrop-blur-md border border-white/10 text-center sm:text-left">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-200">
+            <div className="rounded-2xl bg-white/95 px-5 py-3 border border-teal-200/70 shadow-2xs text-center sm:text-left">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-800">
                 Combined Hours
               </p>
-              <p className="text-xl font-black text-white">
+              <p className="text-xl font-black text-slate-900">
                 <AnimatedCounter value={totalTeamHours} decimals={1} suffix=" hrs" />
               </p>
             </div>
 
             {/* Streak Leader */}
             {leader && maxStreak > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl bg-amber-400/20 px-5 py-3 backdrop-blur-md border border-amber-300/30">
+              <div className="flex items-center gap-3 rounded-2xl bg-amber-100/90 px-5 py-3 border border-amber-300/80 shadow-2xs">
                 <Avatar name={(leader as User).name} src={(leader as User).profilePicture} size="sm" showStatus isOnline={isOnline((leader as User).id)} />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-200">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
                     Streak Leader 🔥
                   </p>
-                  <p className="text-sm font-black text-amber-100">
+                  <p className="text-sm font-black text-amber-950">
                     {(leader as User).name} ({maxStreak} {maxStreak === 1 ? 'day' : 'days'})
                   </p>
                 </div>
@@ -823,19 +837,14 @@ export const ComparisonDashboardPage: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Side-by-side Streak Calendars */}
-      <div className="grid grid-cols-1 gap-8">
-        {streaks.map((streakData, idx) => (
-          <motion.div
-            key={streakData.user.id}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: idx * 0.1 }}
-          >
+      {/* ── 6. Side-by-side Streak Calendars Grid ─────────────── */}
+      <motion.div variants={sectionVariants} className="grid grid-cols-1 gap-8">
+        {streaks.map((streakData) => (
+          <div key={streakData.user.id}>
             <StreakCalendar data={streakData} isOnline={isOnline(streakData.user.id)} />
-          </motion.div>
+          </div>
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
