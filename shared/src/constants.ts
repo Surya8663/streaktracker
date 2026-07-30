@@ -9,6 +9,8 @@ export const API_ROUTES = {
   USERS: '/api/users',
   MILESTONES: '/api/milestones',
   ROADMAP: '/api/roadmap',
+  ROADMAP_MONTH1: '/api/roadmap/month1',
+  ROADMAP_TASKS: '/api/roadmap/tasks',
   PROFILE: '/api/profile',
   UPLOAD_AVATAR: '/api/profile/avatar',
 } as const;
@@ -20,9 +22,9 @@ export const SOCKET_EVENTS = {
   LOG_UPDATED: 'log:updated',
   PRESENCE_UPDATE: 'presence:update',
   MILESTONE_COMPLETED: 'milestone:completed',
+  ROADMAP_UPDATED: 'roadmap:updated',
 } as const;
 
 // ── App Metadata ─────────────────────────────────────────────
 export const APP_NAME = 'StreakTrack';
 export const APP_VERSION = '0.1.0';
-

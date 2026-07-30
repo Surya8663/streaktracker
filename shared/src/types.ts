@@ -191,11 +191,24 @@ export interface MilestoneWonPayload {
 }
 
 // ── Socket Events ────────────────────────────────────────────
+export interface RoadmapWonPayload {
+  userId: number;
+}
+
+export interface RoadmapUpdatedPayload {
+  userId: number;
+  type: 'progress' | 'start' | 'save_day' | 'task_crud';
+  dayNumber?: number;
+  taskId?: number;
+}
+
+// ── Socket Events ────────────────────────────────────────────
 export interface ServerToClientEvents {
   'server:welcome': (message: string) => void;
   'log:updated': (payload: LogUpdatedPayload) => void;
   'presence:update': (payload: PresenceUpdatePayload) => void;
   'milestone:completed': (payload: MilestoneWonPayload) => void;
+  'roadmap:updated': (payload: RoadmapUpdatedPayload) => void;
 }
 
 // ── Month 1 Roadmap Types ────────────────────────────────────
@@ -234,20 +247,64 @@ export interface DailyRoadmapSession {
   createdAt: string;
 }
 
+export interface RoadmapDay {
+  dayNumber: number;
+  weekNumber: number;
+  tasks: RoadmapTask[];
+  session: DailyRoadmapSession | null;
+  isUnlocked: boolean;
+  isCompleted: boolean;
+  completedTasksCount: number;
+  totalTasksCount: number;
+}
+
+export interface UserProgressSummary {
+  userId: number;
+  userName: string;
+  userAvatar: string | null;
+  status: RoadmapProfileStatus;
+  currentDay: number;
+  completedTasksCount: number;
+  totalTasksCount: number;
+  percentComplete: number;
+  totalMinutesStudied: number;
+  startDate: string | null;
+  completionDate: string | null;
+}
+
+export interface Month1RoadmapResponse {
+  days: RoadmapDay[];
+  userProfile: UserRoadmapProfile;
+  myProgress: UserProgressSummary;
+  partnerProgress: UserProgressSummary | null;
+}
+
 export interface ToggleTaskRequest {
   taskId: number;
   isCompleted: boolean;
 }
 
-export interface LogRoadmapSessionRequest {
-  date: string;
+export interface SaveDaySessionRequest {
   minutesStudied: number;
   notes?: string;
 }
 
-export interface UpdateRoadmapProfileRequest {
-  status?: RoadmapProfileStatus;
-  currentDay?: number;
+export interface CreateRoadmapTaskRequest {
+  dayNumber: number;
+  weekNumber?: number;
+  title: string;
+  category: TaskCategory;
+  recommendedMinutes: number;
+  sortOrder?: number;
+}
+
+export interface UpdateRoadmapTaskRequest {
+  dayNumber?: number;
+  weekNumber?: number;
+  title?: string;
+  category?: TaskCategory;
+  recommendedMinutes?: number;
+  sortOrder?: number;
 }
 
 

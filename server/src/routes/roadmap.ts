@@ -1,12 +1,28 @@
 import { Router } from 'express';
 import { API_ROUTES } from '@streaktrack/shared';
-import type { RoadmapPhase, RoadmapResponse, UpdateRoadmapPhaseRequest } from '@streaktrack/shared';
+import type {
+  RoadmapPhase,
+  RoadmapResponse,
+  UpdateRoadmapPhaseRequest,
+  Month1RoadmapResponse,
+  RoadmapDay,
+  RoadmapTask,
+  UserRoadmapProfile,
+  DailyRoadmapSession,
+  UserProgressSummary,
+  TaskCategory,
+  CreateRoadmapTaskRequest,
+  UpdateRoadmapTaskRequest,
+  SaveDaySessionRequest,
+} from '@streaktrack/shared';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { getKolkataDateString } from '../utils/timezone.js';
+import { broadcastLogUpdate, broadcastRoadmapUpdate } from '../index.js';
 
 const router = Router();
 
-// Date helpers
+// Date helpers for 6-month placement roadmap
 function formatDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -36,10 +52,610 @@ interface PhaseRow {
   icon: string;
 }
 
-// ── GET /api/roadmap ─────────────────────────────────────────
+interface TaskRow {
+  id: number;
+  day_number: number;
+  week_number: number;
+  title: string;
+  category: string;
+  recommended_minutes: number;
+  sort_order: number;
+  created_at: string;
+}
+
+interface ProfileRow {
+  user_id: number;
+  status: 'not_started' | 'active' | 'completed';
+  current_day: number;
+  start_date: string | null;
+  completion_date: string | null;
+}
+
+interface SessionRow {
+  id: number;
+  user_id: number;
+  date: string;
+  minutes_studied: number;
+  notes: string | null;
+  created_at: string;
+}
+
+interface UserRow {
+  id: number;
+  name: string;
+  profile_picture: string | null;
+}
+
+const VALID_CATEGORIES: TaskCategory[] = ['DSA', 'LeetCode', 'Python', 'System Design', 'AI Engineer'];
+
+function getUserSummaryProgress(userId: number, totalTasksInRoadmap: number): UserProgressSummary {
+  const userRow = db.prepare('SELECT id, name, profile_picture FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+  const profileRow = db.prepare('SELECT * FROM user_roadmap_profiles WHERE user_id = ?').get(userId) as ProfileRow | undefined;
+
+  const completedCountRow = db
+    .prepare('SELECT COUNT(*) as count FROM user_roadmap_tasks WHERE user_id = ? AND is_completed = 1')
+    .get(userId) as { count: number };
+
+  const minutesRow = db
+    .prepare('SELECT COALESCE(SUM(minutes_studied), 0) as total_mins FROM daily_roadmap_sessions WHERE user_id = ?')
+    .get(userId) as { total_mins: number };
+
+  const completedTasksCount = completedCountRow.count;
+  const totalMinutesStudied = minutesRow.total_mins;
+  const percentComplete = totalTasksInRoadmap > 0 ? Math.min(100, Math.round((completedTasksCount / totalTasksInRoadmap) * 100)) : 0;
+
+  return {
+    userId,
+    userName: userRow?.name || `User #${userId}`,
+    userAvatar: userRow?.profile_picture || null,
+    status: profileRow?.status || 'not_started',
+    currentDay: profileRow?.current_day || 0,
+    completedTasksCount,
+    totalTasksCount: totalTasksInRoadmap,
+    percentComplete,
+    totalMinutesStudied,
+    startDate: profileRow?.start_date || null,
+    completionDate: profileRow?.completion_date || null,
+  };
+}
+
+// ── GET /api/roadmap/month1 ──────────────────────────────────
+router.get(API_ROUTES.ROADMAP_MONTH1, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+
+    // Ensure user profile exists
+    let profileRow = db.prepare('SELECT * FROM user_roadmap_profiles WHERE user_id = ?').get(userId) as ProfileRow | undefined;
+    if (!profileRow) {
+      db.prepare(
+        'INSERT INTO user_roadmap_profiles (user_id, status, current_day, start_date, completion_date) VALUES (?, ?, ?, ?, ?)',
+      ).run(userId, 'not_started', 0, null, null);
+      profileRow = { user_id: userId, status: 'not_started', current_day: 0, start_date: null, completion_date: null };
+    }
+
+    // Fetch all shared tasks
+    const allTaskRows = db
+      .prepare('SELECT * FROM roadmap_tasks ORDER BY day_number ASC, sort_order ASC, id ASC')
+      .all() as TaskRow[];
+
+    // Fetch signed-in user's completion states
+    const userProgressRows = db
+      .prepare('SELECT task_id, is_completed, completed_at FROM user_roadmap_tasks WHERE user_id = ?')
+      .all(userId) as { task_id: number; is_completed: number; completed_at: string | null }[];
+
+    const progressMap = new Map<number, { isCompleted: boolean; completedAt: string | null }>();
+    for (const p of userProgressRows) {
+      progressMap.set(p.task_id, { isCompleted: p.is_completed === 1, completedAt: p.completed_at });
+    }
+
+    // Fetch signed-in user's daily roadmap sessions
+    const sessionRows = db
+      .prepare('SELECT * FROM daily_roadmap_sessions WHERE user_id = ?')
+      .all(userId) as SessionRow[];
+
+    const sessionMap = new Map<string, DailyRoadmapSession>();
+    for (const s of sessionRows) {
+      sessionMap.set(s.date, {
+        id: s.id,
+        userId: s.user_id,
+        date: s.date,
+        minutesStudied: s.minutes_studied,
+        notes: s.notes,
+        createdAt: s.created_at,
+      });
+    }
+
+    // Group tasks by day number (1 to 30)
+    const daysMap = new Map<number, TaskRow[]>();
+    for (let d = 1; d <= 30; d++) {
+      daysMap.set(d, []);
+    }
+    for (const t of allTaskRows) {
+      if (!daysMap.has(t.day_number)) {
+        daysMap.set(t.day_number, []);
+      }
+      daysMap.get(t.day_number)!.push(t);
+    }
+
+    const days: RoadmapDay[] = [];
+    for (let dayNum = 1; dayNum <= 30; dayNum++) {
+      const taskRowsForDay = daysMap.get(dayNum) || [];
+      const weekNumber = Math.ceil(dayNum / 7);
+
+      const tasks: RoadmapTask[] = taskRowsForDay.map((t) => {
+        const prog = progressMap.get(t.id);
+        return {
+          id: t.id,
+          dayNumber: t.day_number,
+          weekNumber: t.week_number,
+          title: t.title,
+          category: t.category as TaskCategory,
+          recommendedMinutes: t.recommended_minutes,
+          sortOrder: t.sort_order,
+          isCompleted: prog?.isCompleted || false,
+          completedAt: prog?.completedAt || null,
+        };
+      });
+
+      const completedTasksCount = tasks.filter((t) => t.isCompleted).length;
+      const totalTasksCount = tasks.length;
+      const isCompleted = totalTasksCount > 0 && completedTasksCount === totalTasksCount;
+
+      // Unlocked if Day 1 OR active and currentDay >= dayNum OR profile is completed
+      const isUnlocked =
+        dayNum === 1 ||
+        profileRow.status === 'completed' ||
+        (profileRow.status === 'active' && dayNum <= profileRow.current_day);
+
+      // Match session for day (by date or latest session)
+      const daySession = sessionRows.length > 0 ? (sessionMap.get(getKolkataDateString()) || null) : null;
+
+      days.push({
+        dayNumber: dayNum,
+        weekNumber,
+        tasks,
+        session: daySession,
+        isUnlocked,
+        isCompleted,
+        completedTasksCount,
+        totalTasksCount,
+      });
+    }
+
+    const totalTasksInRoadmap = allTaskRows.length;
+    const myProgress = getUserSummaryProgress(userId, totalTasksInRoadmap);
+
+    // Fetch partner progress
+    const partnerUser = db
+      .prepare('SELECT id FROM users WHERE id != ? ORDER BY id ASC LIMIT 1')
+      .get(userId) as { id: number } | undefined;
+
+    const partnerProgress = partnerUser ? getUserSummaryProgress(partnerUser.id, totalTasksInRoadmap) : null;
+
+    const userProfile: UserRoadmapProfile = {
+      userId: profileRow.user_id,
+      status: profileRow.status,
+      currentDay: profileRow.current_day,
+      startDate: profileRow.start_date,
+      completionDate: profileRow.completion_date,
+      totalCompletedTasks: myProgress.completedTasksCount,
+      totalTasks: totalTasksInRoadmap,
+      totalMinutesStudied: myProgress.totalMinutesStudied,
+    };
+
+    const response: Month1RoadmapResponse = {
+      days,
+      userProfile,
+      myProgress,
+      partnerProgress,
+    };
+
+    res.json(response);
+  } catch (err: unknown) {
+    console.error('Error fetching month1 roadmap:', err);
+    res.status(500).json({ message: 'Failed to fetch Month 1 Roadmap' });
+  }
+});
+
+// ── POST /api/roadmap/month1/start ───────────────────────────
+router.post(`${API_ROUTES.ROADMAP_MONTH1}/start`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const todayKolkata = getKolkataDateString();
+
+    const existing = db.prepare('SELECT * FROM user_roadmap_profiles WHERE user_id = ?').get(userId) as ProfileRow | undefined;
+
+    const newStatus = 'active';
+    const newCurrentDay = existing && existing.current_day > 0 ? existing.current_day : 1;
+    const newStartDate = existing?.start_date || todayKolkata;
+
+    db.prepare(`
+      INSERT INTO user_roadmap_profiles (user_id, status, current_day, start_date, completion_date)
+      VALUES (?, ?, ?, ?, NULL)
+      ON CONFLICT(user_id) DO UPDATE SET
+        status = excluded.status,
+        current_day = excluded.current_day,
+        start_date = COALESCE(user_roadmap_profiles.start_date, excluded.start_date)
+    `).run(userId, newStatus, newCurrentDay, newStartDate);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'start',
+      dayNumber: newCurrentDay,
+    });
+
+    res.json({
+      message: 'Roadmap started successfully at Day 1',
+      profile: {
+        userId,
+        status: newStatus,
+        currentDay: newCurrentDay,
+        startDate: newStartDate,
+        completionDate: null,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error starting roadmap:', err);
+    res.status(500).json({ message: 'Failed to start roadmap' });
+  }
+});
+
+// ── PATCH /api/roadmap/tasks/:taskId/progress ───────────────
+router.patch(`${API_ROUTES.ROADMAP_TASKS}/:taskId/progress`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const taskId = parseInt(String(req.params.taskId), 10);
+    const { isCompleted } = req.body as { isCompleted?: boolean };
+
+    if (typeof isCompleted !== 'boolean') {
+      res.status(400).json({ message: 'isCompleted field must be a boolean' });
+      return;
+    }
+
+    const taskRow = db.prepare('SELECT id, day_number FROM roadmap_tasks WHERE id = ?').get(taskId) as TaskRow | undefined;
+    if (!taskRow) {
+      res.status(404).json({ message: 'Roadmap task not found' });
+      return;
+    }
+
+    const completedAt = isCompleted ? new Date().toISOString() : null;
+
+    db.prepare(`
+      INSERT INTO user_roadmap_tasks (user_id, task_id, is_completed, completed_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, task_id) DO UPDATE SET
+        is_completed = excluded.is_completed,
+        completed_at = excluded.completed_at
+    `).run(userId, taskId, isCompleted ? 1 : 0, completedAt);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'progress',
+      taskId,
+      dayNumber: taskRow.day_number,
+    });
+
+    res.json({
+      message: 'Task progress updated',
+      taskId,
+      isCompleted,
+      completedAt,
+    });
+  } catch (err: unknown) {
+    console.error('Error updating task progress:', err);
+    res.status(500).json({ message: 'Failed to update task progress' });
+  }
+});
+
+// ── POST /api/roadmap/month1/days/:dayNumber/save ───────────
+router.post(`${API_ROUTES.ROADMAP_MONTH1}/days/:dayNumber/save`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const dayNumber = parseInt(String(req.params.dayNumber), 10);
+    const { minutesStudied, notes } = req.body as SaveDaySessionRequest;
+
+    if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 30) {
+      res.status(400).json({ message: 'Day number must be between 1 and 30' });
+      return;
+    }
+
+    if (typeof minutesStudied !== 'number' || minutesStudied <= 0) {
+      res.status(400).json({ message: 'minutesStudied must be a positive number' });
+      return;
+    }
+
+    let profileRow = db.prepare('SELECT * FROM user_roadmap_profiles WHERE user_id = ?').get(userId) as ProfileRow | undefined;
+    if (!profileRow || profileRow.status === 'not_started') {
+      res.status(400).json({ message: 'Please start your Month 1 Roadmap first before saving daily progress.' });
+      return;
+    }
+
+    // Rule 1: A day can be saved ONLY after at least one task is checked for that day.
+    const completedTasksRow = db
+      .prepare(`
+        SELECT COUNT(*) as count FROM user_roadmap_tasks urt
+        JOIN roadmap_tasks rt ON urt.task_id = rt.id
+        WHERE urt.user_id = ? AND rt.day_number = ? AND urt.is_completed = 1
+      `)
+      .get(userId, dayNumber) as { count: number };
+
+    if (completedTasksRow.count === 0) {
+      res.status(400).json({
+        message: `At least one task in Day ${dayNumber} must be completed before saving progress.`,
+      });
+      return;
+    }
+
+    // Rule 2: Future days cannot be saved before current day.
+    if (profileRow.status !== 'completed' && dayNumber > profileRow.current_day) {
+      res.status(400).json({
+        message: `Cannot save Day ${dayNumber} before reaching it. Your current active day is Day ${profileRow.current_day}.`,
+      });
+      return;
+    }
+
+    const kolkataDate = getKolkataDateString();
+
+    // 1. Save session to daily_roadmap_sessions
+    db.prepare(`
+      INSERT INTO daily_roadmap_sessions (user_id, date, minutes_studied, notes)
+      VALUES (?, ?, ?, ?)
+    `).run(userId, kolkataDate, minutesStudied, notes || null);
+
+    // 2. Auto-sync to daily_logs for Streak Calendar
+    const completedTaskTitlesRow = db
+      .prepare(`
+        SELECT rt.title FROM user_roadmap_tasks urt
+        JOIN roadmap_tasks rt ON urt.task_id = rt.id
+        WHERE urt.user_id = ? AND rt.day_number = ? AND urt.is_completed = 1
+        ORDER BY rt.sort_order ASC
+      `)
+      .all(userId, dayNumber) as { title: string }[];
+
+    const topicsStudied = `Day ${dayNumber}: ` + completedTaskTitlesRow.map((t) => t.title).join(', ');
+    const hoursSpent = Number((minutesStudied / 60).toFixed(2));
+
+    db.prepare(`
+      INSERT INTO daily_logs (user_id, date, topics_studied, hours_spent, notes)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, date) DO UPDATE SET
+        topics_studied = excluded.topics_studied,
+        hours_spent = daily_logs.hours_spent + excluded.hours_spent,
+        notes = COALESCE(excluded.notes, daily_logs.notes)
+    `).run(userId, kolkataDate, topicsStudied, hoursSpent, notes || null);
+
+    // Broadcast log updated event for live streak calendar refresh
+    const userRow = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as { name: string };
+    const latestLog = db.prepare('SELECT * FROM daily_logs WHERE user_id = ? AND date = ?').get(userId, kolkataDate) as {
+      id: number;
+      user_id: number;
+      date: string;
+      topics_studied: string;
+      hours_spent: number;
+      notes: string | null;
+      created_at: string;
+    };
+
+    broadcastLogUpdate({
+      userId,
+      userName: userRow?.name || 'User',
+      log: {
+        id: latestLog.id,
+        userId: latestLog.user_id,
+        date: latestLog.date,
+        topicsStudied: latestLog.topics_studied,
+        hoursSpent: latestLog.hours_spent,
+        notes: latestLog.notes,
+        createdAt: latestLog.created_at,
+      },
+      isEdit: false,
+    });
+
+    // 3. Advance currentDay or mark completed if Day 30
+    let nextDay = profileRow.current_day;
+    let newStatus = profileRow.status;
+    let completionDate = profileRow.completion_date;
+
+    if (dayNumber === 30) {
+      newStatus = 'completed';
+      completionDate = kolkataDate;
+      nextDay = 30;
+    } else {
+      nextDay = Math.max(profileRow.current_day, dayNumber + 1);
+    }
+
+    db.prepare(`
+      UPDATE user_roadmap_profiles
+      SET status = ?, current_day = ?, completion_date = ?
+      WHERE user_id = ?
+    `).run(newStatus, nextDay, completionDate, userId);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'save_day',
+      dayNumber,
+    });
+
+    res.json({
+      message: `Day ${dayNumber} saved successfully and synced to streak calendar!`,
+      currentDay: nextDay,
+      status: newStatus,
+      session: {
+        userId,
+        date: kolkataDate,
+        minutesStudied,
+        notes: notes || null,
+      },
+      syncedLog: {
+        date: kolkataDate,
+        hoursSpent,
+        topicsStudied,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error saving roadmap day:', err);
+    res.status(500).json({ message: 'Failed to save roadmap day session' });
+  }
+});
+
+// ── POST /api/roadmap/tasks (Add Shared Task) ────────────────
+router.post(API_ROUTES.ROADMAP_TASKS, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { dayNumber, weekNumber, title, category, recommendedMinutes, sortOrder } = req.body as CreateRoadmapTaskRequest;
+
+    if (!title || !title.trim()) {
+      res.status(400).json({ message: 'Task title is required' });
+      return;
+    }
+
+    if (typeof dayNumber !== 'number' || dayNumber < 1 || dayNumber > 30) {
+      res.status(400).json({ message: 'dayNumber must be between 1 and 30' });
+      return;
+    }
+
+    if (!VALID_CATEGORIES.includes(category)) {
+      res.status(400).json({ message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` });
+      return;
+    }
+
+    if (typeof recommendedMinutes !== 'number' || recommendedMinutes <= 0) {
+      res.status(400).json({ message: 'recommendedMinutes must be a positive number' });
+      return;
+    }
+
+    const calculatedWeek = weekNumber || Math.ceil(dayNumber / 7);
+    const calculatedSort = typeof sortOrder === 'number' ? sortOrder : 1;
+
+    const result = db.prepare(`
+      INSERT INTO roadmap_tasks (day_number, week_number, title, category, recommended_minutes, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(dayNumber, calculatedWeek, title.trim(), category, recommendedMinutes, calculatedSort);
+
+    const newTask = db.prepare('SELECT * FROM roadmap_tasks WHERE id = ?').get(result.lastInsertRowid) as TaskRow;
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'task_crud',
+      taskId: newTask.id,
+      dayNumber: newTask.day_number,
+    });
+
+    res.status(201).json({
+      message: 'Shared task added successfully',
+      task: {
+        id: newTask.id,
+        dayNumber: newTask.day_number,
+        weekNumber: newTask.week_number,
+        title: newTask.title,
+        category: newTask.category as TaskCategory,
+        recommendedMinutes: newTask.recommended_minutes,
+        sortOrder: newTask.sort_order,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error creating roadmap task:', err);
+    res.status(500).json({ message: 'Failed to create roadmap task' });
+  }
+});
+
+// ── PUT /api/roadmap/tasks/:taskId (Update Shared Task) ─────
+router.put(`${API_ROUTES.ROADMAP_TASKS}/:taskId`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const taskId = parseInt(String(req.params.taskId), 10);
+    const { dayNumber, weekNumber, title, category, recommendedMinutes, sortOrder } = req.body as UpdateRoadmapTaskRequest;
+
+    const existing = db.prepare('SELECT * FROM roadmap_tasks WHERE id = ?').get(taskId) as TaskRow | undefined;
+    if (!existing) {
+      res.status(404).json({ message: 'Roadmap task not found' });
+      return;
+    }
+
+    const newDay = typeof dayNumber === 'number' ? dayNumber : existing.day_number;
+    const newWeek = typeof weekNumber === 'number' ? weekNumber : (typeof dayNumber === 'number' ? Math.ceil(dayNumber / 7) : existing.week_number);
+    const newTitle = title !== undefined ? title.trim() : existing.title;
+    const newCategory = category !== undefined ? category : existing.category;
+    const newMins = typeof recommendedMinutes === 'number' ? recommendedMinutes : existing.recommended_minutes;
+    const newSort = typeof sortOrder === 'number' ? sortOrder : existing.sort_order;
+
+    if (!newTitle) {
+      res.status(400).json({ message: 'Title cannot be empty' });
+      return;
+    }
+
+    if (!VALID_CATEGORIES.includes(newCategory as TaskCategory)) {
+      res.status(400).json({ message: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` });
+      return;
+    }
+
+    db.prepare(`
+      UPDATE roadmap_tasks
+      SET day_number = ?, week_number = ?, title = ?, category = ?, recommended_minutes = ?, sort_order = ?
+      WHERE id = ?
+    `).run(newDay, newWeek, newTitle, newCategory, newMins, newSort, taskId);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'task_crud',
+      taskId,
+      dayNumber: newDay,
+    });
+
+    res.json({
+      message: 'Roadmap task updated successfully',
+      task: {
+        id: taskId,
+        dayNumber: newDay,
+        weekNumber: newWeek,
+        title: newTitle,
+        category: newCategory as TaskCategory,
+        recommendedMinutes: newMins,
+        sortOrder: newSort,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('Error updating roadmap task:', err);
+    res.status(500).json({ message: 'Failed to update roadmap task' });
+  }
+});
+
+// ── DELETE /api/roadmap/tasks/:taskId (Delete Shared Task) ──
+router.delete(`${API_ROUTES.ROADMAP_TASKS}/:taskId`, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const taskId = parseInt(String(req.params.taskId), 10);
+
+    const existing = db.prepare('SELECT * FROM roadmap_tasks WHERE id = ?').get(taskId) as TaskRow | undefined;
+    if (!existing) {
+      res.status(404).json({ message: 'Roadmap task not found' });
+      return;
+    }
+
+    const deleteTransaction = db.transaction((id: number) => {
+      db.prepare('DELETE FROM user_roadmap_tasks WHERE task_id = ?').run(id);
+      db.prepare('DELETE FROM roadmap_tasks WHERE id = ?').run(id);
+    });
+
+    deleteTransaction(taskId);
+
+    broadcastRoadmapUpdate({
+      userId,
+      type: 'task_crud',
+      taskId,
+      dayNumber: existing.day_number,
+    });
+
+    res.json({ message: 'Roadmap task deleted successfully', taskId });
+  } catch (err: unknown) {
+    console.error('Error deleting roadmap task:', err);
+    res.status(500).json({ message: 'Failed to delete roadmap task' });
+  }
+});
+
+// ── GET /api/roadmap (6-Month Placement Roadmap Phases) ───────
 router.get(API_ROUTES.ROADMAP, requireAuth, (_req, res) => {
   try {
-    // 1. Fetch earliest log date across both users (Day 1 anchor)
     const earliestRow = db
       .prepare('SELECT MIN(date) as earliest FROM daily_logs')
       .get() as { earliest: string | null };
@@ -49,33 +665,28 @@ router.get(API_ROUTES.ROADMAP, requireAuth, (_req, res) => {
     const todayObj = new Date();
     const todayStr = formatDate(todayObj);
 
-    // Days elapsed since start date (Day 1)
     const diffTime = todayObj.getTime() - startDateObj.getTime();
     const daysElapsedTotal = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
-    const targetEndDateObj = addDays(startDateObj, 179); // 180 days total
+    const targetEndDateObj = addDays(startDateObj, 179);
     const targetEndDateStr = formatDate(targetEndDateObj);
 
-    // Total hours logged across all users
     const totalHoursRow = db
       .prepare('SELECT COALESCE(SUM(hours_spent), 0) as total_hours FROM daily_logs')
       .get() as { total_hours: number };
     const totalHoursLogged = totalHoursRow.total_hours;
 
-    // 2. Fetch all roadmap phases
     const phaseRows = db
       .prepare('SELECT * FROM roadmap_phases ORDER BY phase_number ASC')
       .all() as PhaseRow[];
 
     const phases: RoadmapPhase[] = phaseRows.map((p) => {
-      // Calculate date window for phase
       const phaseStartDate = addDays(startDateObj, p.start_day - 1);
       const phaseEndDate = addDays(startDateObj, p.end_day - 1);
 
       const phaseStartStr = formatDate(phaseStartDate);
       const phaseEndStr = formatDate(phaseEndDate);
 
-      // Sum hours logged in this phase window across both users
       const phaseHoursRow = db
         .prepare(
           'SELECT COALESCE(SUM(hours_spent), 0) as phase_hours FROM daily_logs WHERE date >= ? AND date <= ?',
@@ -84,7 +695,6 @@ router.get(API_ROUTES.ROADMAP, requireAuth, (_req, res) => {
 
       const actualHours = phaseHoursRow.phase_hours;
 
-      // Days elapsed inside this specific phase
       let daysElapsedInPhase = 0;
       if (todayStr >= phaseStartStr) {
         if (todayStr >= phaseEndStr) {
@@ -98,13 +708,8 @@ router.get(API_ROUTES.ROADMAP, requireAuth, (_req, res) => {
       }
 
       const totalDaysInPhase = p.end_day - p.start_day + 1;
-
-      // Unlocked if current date is within or past phase start date, OR hours recorded
       const isUnlocked = daysElapsedTotal >= p.start_day || actualHours > 0;
-
-      // Completed if actual hours >= target hours OR phase end date has passed
       const isCompleted = actualHours >= p.target_hours || daysElapsedTotal > p.end_day;
-
       const percentComplete = Math.min(100, Math.round((actualHours / p.target_hours) * 100));
 
       return {

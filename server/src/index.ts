@@ -14,6 +14,7 @@ import type {
   AuthUser,
   LogUpdatedPayload,
   MilestoneWonPayload,
+  RoadmapUpdatedPayload,
 } from '@streaktrack/shared';
 
 // Initialize database (side-effect: creates file + tables)
@@ -129,6 +130,10 @@ export function broadcastLogUpdate(payload: LogUpdatedPayload) {
 
 export function broadcastMilestoneCompleted(payload: MilestoneWonPayload) {
   io.emit(SOCKET_EVENTS.MILESTONE_COMPLETED, payload);
+}
+
+export function broadcastRoadmapUpdate(payload: RoadmapUpdatedPayload) {
+  io.emit(SOCKET_EVENTS.ROADMAP_UPDATED, payload);
 }
 
 io.on('connection', (socket) => {
