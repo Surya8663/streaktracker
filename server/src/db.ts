@@ -361,14 +361,14 @@ if (!migrationExecuted) {
   }
 }
 
-// Ensure default user roadmap profiles exist
+// Ensure default user roadmap profiles exist (Default: Day 0 not_started)
 const suryaUser = db.prepare('SELECT id FROM users WHERE email = ?').get('surya@streaktrack.app') as { id: number } | undefined;
 if (suryaUser) {
   db.prepare(`
     INSERT INTO user_roadmap_profiles (user_id, status, current_day, start_date, completion_date)
-    VALUES (?, 'active', 1, ?, NULL)
+    VALUES (?, 'not_started', 0, NULL, NULL)
     ON CONFLICT(user_id) DO NOTHING
-  `).run(suryaUser.id, new Date().toISOString().split('T')[0]);
+  `).run(suryaUser.id);
 }
 
 const gomathiUser = db.prepare('SELECT id FROM users WHERE email = ?').get('gomathi@streaktrack.app') as { id: number } | undefined;
@@ -378,6 +378,18 @@ if (gomathiUser) {
     VALUES (?, 'not_started', 0, NULL, NULL)
     ON CONFLICT(user_id) DO NOTHING
   `).run(gomathiUser.id);
+}
+
+// ── One-time migration: Clean stale milestones for 0 log users ───────────────
+const phase7MigrationName = 'phase7_clean_reset_v1';
+const phase7Executed = db.prepare('SELECT 1 FROM migrations WHERE name = ?').get(phase7MigrationName);
+
+if (!phase7Executed) {
+  db.transaction(() => {
+    db.prepare('DELETE FROM milestones').run();
+    db.prepare('INSERT INTO migrations (name) VALUES (?)').run(phase7MigrationName);
+  })();
+  console.log('[db/migration] Applied phase7_clean_reset_v1: Cleaned stale milestones.');
 }
 
 console.log(`[db] SQLite connected: ${DB_PATH}`);

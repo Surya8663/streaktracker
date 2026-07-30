@@ -33,7 +33,7 @@ npm install
 ```
 
 ### 2. Seed Database
-Seeds 18 days of initial study logs for both Surya & Gomathi across 3 completed 5-day blocks:
+Performs a clean state reset for both Surya & Gomathi, initializing both accounts at **Day 0** with 0 streak and 0 logs:
 ```bash
 npm run seed -w server
 ```

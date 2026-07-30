@@ -41,10 +41,9 @@ function mapRowToLog(row: {
 // ── GET /api/logs/:userId ────────────────────────────────────
 router.get(`${API_ROUTES.LOGS}/:userId`, requireAuth, (req, res) => {
   const targetUserId = parseInt(String(req.params.userId), 10);
-  const currentUserId = req.user!.id;
 
-  if (targetUserId !== currentUserId) {
-    res.status(403).json({ message: 'Cannot access logs for another user' });
+  if (isNaN(targetUserId)) {
+    res.status(400).json({ message: 'Invalid user ID' });
     return;
   }
 
@@ -52,7 +51,7 @@ router.get(`${API_ROUTES.LOGS}/:userId`, requireAuth, (req, res) => {
     .prepare(
       'SELECT id, user_id, date, topics_studied, hours_spent, notes, created_at FROM daily_logs WHERE user_id = ? ORDER BY date DESC, id DESC',
     )
-    .all(currentUserId) as {
+    .all(targetUserId) as {
     id: number;
     user_id: number;
     date: string;
@@ -224,6 +223,52 @@ router.put(`${API_ROUTES.LOGS}/:id`, requireAuth, (req, res) => {
   } catch (err: unknown) {
     console.error('Error updating log:', err);
     res.status(500).json({ message: 'Failed to update log' });
+  }
+});
+
+// ── DELETE /api/logs/:id ─────────────────────────────────────
+router.delete(`${API_ROUTES.LOGS}/:id`, requireAuth, (req, res) => {
+  const logId = parseInt(String(req.params.id), 10);
+  const userId = req.user!.id;
+  const userName = req.user!.name;
+
+  const existing = db
+    .prepare('SELECT id, user_id, date, topics_studied, hours_spent, notes, created_at FROM daily_logs WHERE id = ?')
+    .get(logId) as {
+    id: number;
+    user_id: number;
+    date: string;
+    topics_studied: string;
+    hours_spent: number;
+    notes: string | null;
+    created_at: string;
+  } | undefined;
+
+  if (!existing) {
+    res.status(404).json({ message: 'Log entry not found' });
+    return;
+  }
+
+  if (existing.user_id !== userId) {
+    res.status(403).json({ message: 'Unauthorized to delete this log' });
+    return;
+  }
+
+  try {
+    db.prepare('DELETE FROM daily_logs WHERE id = ?').run(logId);
+
+    const deletedLog = mapRowToLog(existing);
+    broadcastLogUpdate({
+      userId,
+      userName,
+      log: deletedLog,
+      isEdit: true,
+    });
+
+    res.json({ message: 'Log deleted successfully', deletedLogId: logId });
+  } catch (err: unknown) {
+    console.error('Error deleting log:', err);
+    res.status(500).json({ message: 'Failed to delete log' });
   }
 });
 
