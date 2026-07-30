@@ -103,14 +103,14 @@ export const RoadmapPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="space-y-8 pb-12"
+    >
       {/* Top Banner: Overall Placement Progress */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-3xl border border-slate-200/80 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 p-6 sm:p-8 text-white shadow-xl"
-      >
+      <div className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 p-6 sm:p-8 text-white shadow-sm border-t-3 border-t-indigo-500">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-indigo-300 mb-2 border border-white/10">
@@ -152,15 +152,10 @@ export const RoadmapPage: React.FC = () => {
             />
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Horizontal Timeline Visualization */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-        className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-sm overflow-x-auto"
-      >
+      <div className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-2xs border-t-3 border-t-indigo-500 overflow-x-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-xl font-bold text-slate-900">Roadmap Timeline Nodes</h3>
@@ -254,7 +249,7 @@ export const RoadmapPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Editable Phase Cards Grid */}
       <div className="space-y-4">
@@ -433,6 +428,6 @@ export const RoadmapPage: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };

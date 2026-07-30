@@ -93,23 +93,15 @@ export const MilestonesPage: React.FC = () => {
   const currentBlock = data?.currentBlock;
   const treatScoreboard = data?.treatScoreboard || [];
 
-  const currentUserTreatsOwed = user
-    ? treatScoreboard.find((t) => t.userId === user.id)?.treatsOwed || 0
-    : 0;
-
-  const otherUserScore = user
-    ? treatScoreboard.find((t) => t.userId !== user.id)
-    : null;
-
   return (
-    <div className="space-y-8">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="space-y-8"
+    >
       {/* Treat Scoreboard Header Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-3xl border border-slate-200/80 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-6 sm:p-8 text-white shadow-lg"
-      >
+      <div className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-6 sm:p-8 text-white shadow-xs border-t-3 border-t-amber-400">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -118,7 +110,7 @@ export const MilestonesPage: React.FC = () => {
               </span>
               <button
                 onClick={triggerTestConfetti}
-                className="cursor-pointer rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white transition-all hover:bg-white/30"
+                className="btn-press cursor-pointer rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white transition-all hover:bg-white/30"
               >
                 🎉 Confetti Test
               </button>
@@ -164,36 +156,31 @@ export const MilestonesPage: React.FC = () => {
             })}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Current In-Progress Block Card */}
       {currentBlock && (
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="rounded-3xl border border-indigo-200/80 bg-indigo-50/50 p-6 sm:p-8 shadow-sm"
-        >
+        <div className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-2xs border-t-3 border-t-indigo-500">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
+                <span className="rounded-full bg-indigo-100 text-indigo-900 border border-indigo-200 px-3 py-1 text-xs font-black">
                   Block #{currentBlock.blockNumber} — In Progress 🔄
                 </span>
                 <span className="text-xs text-indigo-700 font-semibold">
                   {currentBlock.startDate} to {currentBlock.endDate}
                 </span>
               </div>
-              <h3 className="mt-2 text-xl font-bold text-indigo-950">
+              <h3 className="mt-2 text-xl font-bold text-slate-900">
                 Current 5-Day Sprint
               </h3>
             </div>
 
-            <div className="rounded-xl bg-white border border-indigo-200 px-4 py-2 text-right shadow-2xs">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+            <div className="rounded-xl bg-stone-50 border border-stone-200/80 px-4 py-2 text-right shadow-2xs">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
                 Time Remaining
               </p>
-              <p className="text-sm font-extrabold text-indigo-950">
+              <p className="text-sm font-extrabold text-slate-900">
                 {currentBlock.daysRemaining} {currentBlock.daysRemaining === 1 ? 'day left' : 'days left'}
               </p>
             </div>
@@ -202,7 +189,7 @@ export const MilestonesPage: React.FC = () => {
           {/* User Progress Comparison Bars */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* User 1 (Surya) */}
-            <div className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-2xs">
+            <div className="rounded-2xl bg-stone-50/60 border border-stone-200/80 p-5 shadow-2xs">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
                   <Avatar name={currentBlock.user1Name} src="/avatars/surya.jpg" size="sm" showStatus isOnline={isOnline(currentBlock.user1Id)} />
@@ -212,8 +199,7 @@ export const MilestonesPage: React.FC = () => {
                   {currentBlock.user1Hours.toFixed(1)} hrs
                 </span>
               </div>
-              {/* Progress visual */}
-              <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2.5 w-full rounded-full bg-stone-200 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-indigo-500 transition-all duration-500"
                   style={{
@@ -227,7 +213,7 @@ export const MilestonesPage: React.FC = () => {
             </div>
 
             {/* User 2 (Gomathi) */}
-            <div className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-2xs">
+            <div className="rounded-2xl bg-stone-50/60 border border-stone-200/80 p-5 shadow-2xs">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
                   <Avatar name={currentBlock.user2Name} src="/avatars/gomathi.jpg" size="sm" showStatus isOnline={isOnline(currentBlock.user2Id)} />
@@ -237,8 +223,7 @@ export const MilestonesPage: React.FC = () => {
                   {currentBlock.user2Hours.toFixed(1)} hrs
                 </span>
               </div>
-              {/* Progress visual */}
-              <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-2.5 w-full rounded-full bg-stone-200 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-purple-500 transition-all duration-500"
                   style={{
@@ -251,7 +236,7 @@ export const MilestonesPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Timeline of Completed Blocks */}
@@ -266,7 +251,7 @@ export const MilestonesPage: React.FC = () => {
         </div>
 
         {milestones.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center text-slate-500 font-medium">
+          <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center text-slate-500 font-medium">
             No 5-day blocks have completed yet. Keep logging study hours to complete Block #1!
           </div>
         ) : (
@@ -274,80 +259,72 @@ export const MilestonesPage: React.FC = () => {
             {milestones
               .slice()
               .reverse()
-              .map((milestone, idx) => {
-                const winnerPhoto =
-                  milestone.winnerName === 'Surya' ? '/avatars/surya.jpg' : '/avatars/gomathi.jpg';
+              .map((milestone) => (
+                <div
+                  key={milestone.blockNumber}
+                  className={`rounded-3xl border p-6 transition-all shadow-2xs hover:shadow-md ${
+                    milestone.isTie
+                      ? 'border-stone-200/80 bg-white border-t-3 border-t-stone-400'
+                      : 'border-stone-200/80 bg-gradient-to-r from-emerald-50/50 via-white to-white border-t-3 border-t-emerald-500'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    {/* Left: Block Info & Winner Badge */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 font-extrabold text-white text-base shadow-xs">
+                        #{milestone.blockNumber}
+                      </div>
 
-                return (
-                  <motion.div
-                    key={milestone.blockNumber}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: idx * 0.05 }}
-                    className={`rounded-3xl border p-6 transition-all shadow-xs hover:shadow-md ${
-                      milestone.isTie
-                        ? 'border-slate-200 bg-white'
-                        : 'border-emerald-200/80 bg-gradient-to-r from-emerald-50/50 via-white to-white'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      {/* Left: Block Info & Winner Badge */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 font-extrabold text-white text-base shadow-xs">
-                          #{milestone.blockNumber}
-                        </div>
-
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-semibold text-slate-500">
-                              {milestone.startDate} to {milestone.endDate}
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500">
+                            {milestone.startDate} to {milestone.endDate}
+                          </span>
+                          {milestone.isTie ? (
+                            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 border border-stone-200">
+                              🤝 Draw — No treat owed
                             </span>
-                            {milestone.isTie ? (
-                              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 border border-slate-200">
-                                🤝 Draw — No treat owed
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800 border border-emerald-200">
-                                🏆 {milestone.winnerName} won block #{milestone.blockNumber}!
-                              </span>
-                            )}
-                          </div>
-
-                          {!milestone.isTie && milestone.loserName && (
-                            <p className="mt-1 text-xs font-semibold text-amber-800">
-                              🍫 {milestone.loserName} owes {milestone.winnerName} a treat!
-                            </p>
+                          ) : (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800 border border-emerald-200">
+                              🏆 {milestone.winnerName} won block #{milestone.blockNumber}!
+                            </span>
                           )}
                         </div>
-                      </div>
 
-                      {/* Right: Hours breakdown */}
-                      <div className="flex items-center gap-4 rounded-2xl bg-slate-50 border border-slate-200/60 px-4 py-2.5">
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-slate-800">
-                            {milestone.user1Name}
+                        {!milestone.isTie && milestone.loserName && (
+                          <p className="mt-1 text-xs font-semibold text-amber-800">
+                            🍫 {milestone.loserName} owes {milestone.winnerName} a treat!
                           </p>
-                          <p className="text-sm font-extrabold text-indigo-600">
-                            {milestone.user1Hours.toFixed(1)} hrs
-                          </p>
-                        </div>
-                        <span className="text-xs font-bold text-slate-400">vs</span>
-                        <div className="text-left">
-                          <p className="text-xs font-bold text-slate-800">
-                            {milestone.user2Name}
-                          </p>
-                          <p className="text-sm font-extrabold text-purple-600">
-                            {milestone.user2Hours.toFixed(1)} hrs
-                          </p>
-                        </div>
+                        )}
                       </div>
                     </div>
-                  </motion.div>
-                );
-              })}
+
+                    {/* Right: Hours breakdown */}
+                    <div className="flex items-center gap-4 rounded-2xl bg-stone-50 border border-stone-200/60 px-4 py-2.5">
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-slate-800">
+                          {milestone.user1Name}
+                        </p>
+                        <p className="text-sm font-extrabold text-indigo-600">
+                          {milestone.user1Hours.toFixed(1)} hrs
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">vs</span>
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-slate-800">
+                          {milestone.user2Name}
+                        </p>
+                        <p className="text-sm font-extrabold text-purple-600">
+                          {milestone.user2Hours.toFixed(1)} hrs
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 };

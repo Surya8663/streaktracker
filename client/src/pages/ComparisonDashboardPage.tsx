@@ -395,10 +395,10 @@ export const ComparisonDashboardPage: React.FC = () => {
               whileHover={{ scale: 1.025, y: -4, rotateY: -3 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 border-t-3 border-t-amber-500 ${
                 isSuryaLeading
                   ? 'bg-gradient-to-br from-amber-100/80 via-amber-50/60 to-stone-50 border-amber-300 shadow-md ring-2 ring-amber-400/40'
-                  : 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+                  : 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 border-stone-200/80 shadow-2xs'
               }`}
             >
               {/* Leading Crown Badge */}
@@ -453,10 +453,10 @@ export const ComparisonDashboardPage: React.FC = () => {
               whileHover={{ scale: 1.025, y: -4, rotateY: 3 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               style={{ perspective: 1000, transformStyle: 'preserve-3d' }}
-              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+              className={`relative w-full sm:w-auto flex-1 flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 border-t-3 border-t-emerald-500 ${
                 isGomathiLeading
                   ? 'bg-gradient-to-br from-emerald-100/80 via-emerald-50/60 to-stone-50 border-emerald-300 shadow-md ring-2 ring-emerald-400/40'
-                  : 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+                  : 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-stone-50 border-stone-200/80 shadow-2xs'
               }`}
             >
               {/* Leading Crown Badge */}

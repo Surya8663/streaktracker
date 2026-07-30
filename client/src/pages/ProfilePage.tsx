@@ -100,7 +100,7 @@ export const ProfilePage: React.FC = () => {
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-3 border-teal-500 border-t-transparent" />
-          <p className="text-sm font-medium text-slate-500">Loading profile & stats...</p>
+          <p className="text-sm font-medium text-slate-500">Loading user profile...</p>
         </div>
       </div>
     );
@@ -127,7 +127,12 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="space-y-8 pb-12"
+    >
       {/* Hidden File Input for Avatar Upload */}
       <input
         type="file"
@@ -138,12 +143,7 @@ export const ProfilePage: React.FC = () => {
       />
 
       {/* Main Profile Header Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-xs"
-      >
+      <div className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-2xs border-t-3 border-t-teal-500">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           {/* Avatar with Upload Camera Badge */}
           <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -225,15 +225,10 @@ export const ProfilePage: React.FC = () => {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Editable Goal & About Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-        className="rounded-3xl border border-teal-200/80 bg-teal-50/50 p-6 sm:p-8 shadow-xs"
-      >
+      <div className="rounded-3xl border border-teal-200/80 bg-teal-50/50 p-6 sm:p-8 shadow-2xs border-t-3 border-t-teal-500">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="text-lg">🎯</span>
@@ -274,7 +269,7 @@ export const ProfilePage: React.FC = () => {
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
 
       {/* Lifetime Stats Cards Grid */}
       <div className="space-y-4">
@@ -282,12 +277,7 @@ export const ProfilePage: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Total Study Hours */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.15 }}
-            className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-xs"
-          >
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-2xs border-t-3 border-t-emerald-500">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Total Study Hours
@@ -298,15 +288,38 @@ export const ProfilePage: React.FC = () => {
               <AnimatedCounter value={profileData.totalHoursLogged} decimals={1} suffix=" hrs" />
             </p>
             <p className="mt-1 text-xs text-slate-500 font-medium">All-time study time logged</p>
-          </motion.div>
+          </div>
+
+          {/* Current Streak */}
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-2xs border-t-3 border-t-amber-500">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Current Streak
+              </span>
+              <span className="text-2xl">🔥</span>
+            </div>
+            <p className="text-3xl font-black text-slate-900">
+              <AnimatedCounter value={profileData.currentStreak} suffix=" days" />
+            </p>
+            <p className="mt-1 text-xs text-slate-500 font-medium">Consecutive study days</p>
+          </div>
+
+          {/* Best Streak Record */}
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-2xs border-t-3 border-t-amber-500">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Longest Streak Record
+              </span>
+              <span className="text-2xl">⚡</span>
+            </div>
+            <p className="text-3xl font-black text-slate-900">
+              <AnimatedCounter value={profileData.longestStreak} suffix=" days" />
+            </p>
+            <p className="mt-1 text-xs text-slate-500 font-medium">Personal best record</p>
+          </div>
 
           {/* Days Active */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-xs"
-          >
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-2xs border-t-3 border-t-teal-500">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Days Active
@@ -314,71 +327,26 @@ export const ProfilePage: React.FC = () => {
               <span className="text-2xl">📅</span>
             </div>
             <p className="text-3xl font-black text-slate-900">
-              <AnimatedCounter value={profileData.totalDaysActive} suffix=" Days" />
+              <AnimatedCounter value={profileData.totalDaysActive} suffix=" days" />
             </p>
-            <p className="mt-1 text-xs text-slate-500 font-medium">Unique calendar days logged</p>
-          </motion.div>
+            <p className="mt-1 text-xs text-slate-500 font-medium">Days with logged study hours</p>
+          </div>
 
-          {/* Current Streak */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.25 }}
-            className="rounded-3xl border border-amber-200/80 bg-amber-50/60 p-6 shadow-xs"
-          >
+          {/* Milestones Won */}
+          <div className="rounded-3xl border border-stone-200/80 bg-white p-6 shadow-2xs border-t-3 border-t-amber-500">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                Current Streak
-              </span>
-              <span className="text-2xl animate-float">🔥</span>
-            </div>
-            <p className="text-3xl font-black text-amber-950">
-              <AnimatedCounter value={profileData.currentStreak} suffix={profileData.currentStreak === 1 ? ' Day' : ' Days'} />
-            </p>
-            <p className="mt-1 text-xs text-amber-800/80 font-medium">Active consecutive study days</p>
-          </motion.div>
-
-          {/* Longest Streak */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className="rounded-3xl border border-teal-200/80 bg-teal-50/60 p-6 shadow-xs"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-teal-800">
-                Longest Streak
-              </span>
-              <span className="text-2xl">✨</span>
-            </div>
-            <p className="text-3xl font-black text-teal-950">
-              <AnimatedCounter value={profileData.longestStreak} suffix={profileData.longestStreak === 1 ? ' Day' : ' Days'} />
-            </p>
-            <p className="mt-1 text-xs text-teal-800/80 font-medium">Best consecutive streak record</p>
-          </motion.div>
-
-          {/* 5-Day Milestones Won */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.35 }}
-            className="rounded-3xl border border-emerald-200/80 bg-emerald-50/60 p-6 shadow-xs sm:col-span-2 lg:col-span-2"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                5-Day Block Milestones Won
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Milestones Won
               </span>
               <span className="text-2xl">🏆</span>
             </div>
-            <p className="text-3xl font-black text-emerald-950">
-              <AnimatedCounter value={profileData.milestonesWon} suffix={profileData.milestonesWon === 1 ? ' Block Won' : ' Blocks Won'} />
+            <p className="text-3xl font-black text-slate-900">
+              <AnimatedCounter value={profileData.milestonesWon} suffix=" blocks" />
             </p>
-            <p className="mt-1 text-xs text-emerald-800/80 font-medium">
-              5-day study sprints won in friendly competition
-            </p>
-          </motion.div>
+            <p className="mt-1 text-xs text-slate-500 font-medium">5-day sprint blocks won</p>
+          </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
