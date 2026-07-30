@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -14,10 +14,11 @@ import type {
   RoadmapUpdatedPayload,
   RoadmapSource,
   RoadmapSourceLink,
+  RoadmapChatMessage,
 } from '@streaktrack/shared';
 import { getApiUrl } from '../utils/api.js';
 
-type TabView = 'journey' | 'sources' | 'DSA' | 'LeetCode' | 'Python' | 'System Design' | 'AI Engineer';
+type TabView = 'journey' | 'sources' | 'chat' | 'DSA' | 'LeetCode' | 'Python' | 'System Design' | 'AI Engineer';
 
 const CATEGORIES: TaskCategory[] = ['DSA', 'LeetCode', 'Python', 'System Design', 'AI Engineer'];
 
@@ -78,6 +79,13 @@ export const RoadmapPage: React.FC = () => {
   const [linkNote, setLinkNote] = useState('');
   const [isSubmittingLink, setIsSubmittingLink] = useState(false);
 
+  // Study Chat states
+  const { isOnline } = useSocket();
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [chatMessages, setChatMessages] = useState<RoadmapChatMessage[]>([]);
+  const [chatText, setChatText] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
+
   // Fetch Month 1 Roadmap Data
   const fetchRoadmap = useCallback(async () => {
     try {
@@ -107,23 +115,102 @@ export const RoadmapPage: React.FC = () => {
     }
   }, []);
 
+  // Fetch Chat Messages Data
+  const fetchChatMessages = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_CHAT), { credentials: 'include' });
+      if (res.ok) {
+        const data: RoadmapChatMessage[] = await res.json();
+        setChatMessages(data);
+      }
+    } catch (err) {
+      console.error('Failed to load chat messages', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchRoadmap();
     fetchSources();
-  }, [fetchRoadmap, fetchSources]);
+    fetchChatMessages();
+  }, [fetchRoadmap, fetchSources, fetchChatMessages]);
 
-  // Listen for Socket.io real-time updates
+  // Listen for Socket.io real-time updates & chat messages
   useEffect(() => {
     if (!socket) return;
     const handleUpdated = (_payload: RoadmapUpdatedPayload) => {
       fetchRoadmap();
       fetchSources();
     };
+
+    const handleChatMessage = (newMsg: RoadmapChatMessage) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    };
+
     socket.on(SOCKET_EVENTS.ROADMAP_UPDATED, handleUpdated);
+    socket.on(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
+
     return () => {
       socket.off(SOCKET_EVENTS.ROADMAP_UPDATED, handleUpdated);
+      socket.off(SOCKET_EVENTS.CHAT_MESSAGE, handleChatMessage);
     };
   }, [socket, fetchRoadmap, fetchSources]);
+
+  // Auto scroll to latest chat message
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, activeTab]);
+
+  const handleSendChat = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const textToSend = chatText.trim();
+    if (!textToSend) return;
+
+    if (textToSend.length > 1500) {
+      toast.error('Message length exceeds 1500 characters limit.');
+      return;
+    }
+
+    try {
+      setSendingChat(true);
+      setChatText('');
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP_CHAT), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSend }),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to send message' }));
+        throw new Error(err.message || 'Failed to send message');
+      }
+
+      const data = await res.json();
+      if (data.chatMessage) {
+        setChatMessages((prev) => {
+          if (prev.some((m) => m.id === data.chatMessage.id)) return prev;
+          return [...prev, data.chatMessage];
+        });
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send message');
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  const handleKeyDownChat = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendChat();
+    }
+  };
 
   // Task Progress Toggle
   const handleToggleTask = async (taskId: number, currentCompleted: boolean) => {
@@ -689,6 +776,21 @@ export const RoadmapPage: React.FC = () => {
             📚 Sources Vault
           </button>
 
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`btn-press cursor-pointer rounded-2xl px-4 py-2.5 text-xs font-extrabold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'chat'
+                ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20'
+                : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span>💬</span>
+            <span>Study Chat</span>
+            {partnerProgress && isOnline(partnerProgress.userId) && (
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+
           {CATEGORIES.map((cat) => {
             const badge = CATEGORY_BADGES[cat];
             const isActive = activeTab === cat;
@@ -989,8 +1091,112 @@ export const RoadmapPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── 3. Category Views (DSA, LeetCode, Python, System Design, AI Engineer) ── */}
-      {activeTab !== 'journey' && activeTab !== 'sources' && (
+      {/* ── 3. Real-time Pair Study Chat View ────────────────────────────── */}
+      {activeTab === 'chat' && (
+        <div className="rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl flex flex-col h-[650px] overflow-hidden">
+          {/* Chat Header */}
+          <div className="flex items-center justify-between bg-slate-950 px-6 py-4 border-b border-slate-800 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-500/20 text-purple-400 text-xl border border-purple-500/30">
+                💬
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Study Pair Chat</h3>
+                <p className="text-xs text-slate-400 font-medium">
+                  Direct communication for study tasks, blockers & resource sharing
+                </p>
+              </div>
+            </div>
+
+            {partnerProgress && (
+              <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800 text-xs font-bold">
+                <span className={`h-2.5 w-2.5 rounded-full ${isOnline(partnerProgress.userId) ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-600'}`} />
+                <span className="text-slate-300">{partnerProgress.userName} ({isOnline(partnerProgress.userId) ? 'Online' : 'Offline'})</span>
+              </div>
+            )}
+          </div>
+
+          {/* Messages Stream Container */}
+          <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-slate-950/40">
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-slate-500">
+                <span className="text-4xl">💬</span>
+                <p className="text-xs font-bold text-slate-400 max-w-sm">
+                  No messages yet. Send a message to discuss today's roadmap tasks or blockers with your study partner!
+                </p>
+              </div>
+            ) : (
+              chatMessages.map((msg) => {
+                const isMe = user?.id === msg.senderId;
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex items-start gap-3 max-w-[85%] sm:max-w-[70%] ${
+                      isMe ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                    }`}
+                  >
+                    {!isMe && (
+                      <Avatar name={msg.senderName} src={msg.senderAvatar} size="sm" />
+                    )}
+
+                    <div className="space-y-1 min-w-0">
+                      <div className={`flex items-center gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <span className="text-[10px] font-bold text-slate-400">{msg.senderName}</span>
+                        <span className="text-[10px] text-slate-500">{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+
+                      <div
+                        className={`rounded-2xl px-4 py-3 text-xs sm:text-sm font-medium leading-relaxed break-words shadow-md ${
+                          isMe
+                            ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-tr-xs'
+                            : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-xs'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input Bar */}
+          <form onSubmit={handleSendChat} className="bg-slate-950 p-4 border-t border-slate-800 shrink-0 space-y-2">
+            <div className="relative">
+              <textarea
+                rows={2}
+                maxLength={1500}
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                onKeyDown={handleKeyDownChat}
+                placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 resize-none"
+              />
+
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-slate-500 font-semibold">
+                  {chatText.length} / 1500 chars
+                </span>
+
+                <button
+                  type="submit"
+                  disabled={sendingChat || !chatText.trim()}
+                  className="btn-press cursor-pointer rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs px-5 py-2 shadow-md disabled:opacity-40 flex items-center gap-1.5 transition-all"
+                >
+                  <span>{sendingChat ? 'Sending...' : 'Send Message'}</span>
+                  <span>🚀</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── 4. Category Views (DSA, LeetCode, Python, System Design, AI Engineer) ── */}
+      {activeTab !== 'journey' && activeTab !== 'sources' && activeTab !== 'chat' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
             <div className="flex items-center gap-3">

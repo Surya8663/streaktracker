@@ -202,6 +202,19 @@ export interface RoadmapUpdatedPayload {
   taskId?: number;
 }
 
+export interface RoadmapChatMessage {
+  id: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar: string | null;
+  text: string;
+  createdAt: string;
+}
+
+export interface SendChatMessageRequest {
+  text: string;
+}
+
 // ── Socket Events ────────────────────────────────────────────
 export interface ServerToClientEvents {
   'server:welcome': (message: string) => void;
@@ -209,6 +222,7 @@ export interface ServerToClientEvents {
   'presence:update': (payload: PresenceUpdatePayload) => void;
   'milestone:completed': (payload: MilestoneWonPayload) => void;
   'roadmap:updated': (payload: RoadmapUpdatedPayload) => void;
+  'chat:message': (payload: RoadmapChatMessage) => void;
 }
 
 // ── Month 1 Roadmap Types ────────────────────────────────────

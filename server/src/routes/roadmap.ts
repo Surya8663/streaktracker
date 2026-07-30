@@ -14,11 +14,13 @@ import type {
   CreateRoadmapTaskRequest,
   UpdateRoadmapTaskRequest,
   SaveDaySessionRequest,
+  RoadmapChatMessage,
+  SendChatMessageRequest,
 } from '@streaktrack/shared';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getKolkataDateString } from '../utils/timezone.js';
-import { broadcastLogUpdate, broadcastRoadmapUpdate } from '../index.js';
+import { broadcastLogUpdate, broadcastRoadmapUpdate, broadcastChatMessage } from '../index.js';
 
 const router = Router();
 
@@ -1081,6 +1083,91 @@ router.delete(`${API_ROUTES.ROADMAP_SOURCES}/:sourceId`, requireAuth, (req, res)
   } catch (err: unknown) {
     console.error('Error deleting source group:', err);
     res.status(500).json({ message: 'Failed to delete source group' });
+  }
+});
+
+// ── Real-time Pair Study Chat Routes ─────────────────────────
+interface ChatMessageRow {
+  id: number;
+  sender_id: number;
+  text: string;
+  created_at: string;
+  sender_name: string;
+  sender_avatar: string | null;
+}
+
+// GET /api/roadmap/chat
+router.get(API_ROUTES.ROADMAP_CHAT, requireAuth, (_req, res) => {
+  try {
+    const rows = db
+      .prepare(`
+        SELECT m.id, m.sender_id, m.text, m.created_at, u.name as sender_name, u.profile_picture as sender_avatar
+        FROM roadmap_chat_messages m
+        JOIN users u ON m.sender_id = u.id
+        ORDER BY m.id DESC
+        LIMIT 100
+      `)
+      .all() as ChatMessageRow[];
+
+    // Reverse to return chronological order (oldest to newest)
+    const messages: RoadmapChatMessage[] = rows.reverse().map((r) => ({
+      id: r.id,
+      senderId: r.sender_id,
+      senderName: r.sender_name,
+      senderAvatar: r.sender_avatar,
+      text: r.text,
+      createdAt: r.created_at,
+    }));
+
+    res.json(messages);
+  } catch (err: unknown) {
+    console.error('Error fetching chat messages:', err);
+    res.status(500).json({ message: 'Failed to fetch chat messages' });
+  }
+});
+
+// POST /api/roadmap/chat
+router.post(API_ROUTES.ROADMAP_CHAT, requireAuth, (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const { text } = req.body as SendChatMessageRequest;
+
+    if (!text || !text.trim()) {
+      res.status(400).json({ message: 'Chat message cannot be empty' });
+      return;
+    }
+
+    const trimmedText = text.trim();
+    if (trimmedText.length > 1500) {
+      res.status(400).json({ message: 'Chat message exceeds maximum limit of 1500 characters' });
+      return;
+    }
+
+    const result = db
+      .prepare('INSERT INTO roadmap_chat_messages (sender_id, text) VALUES (?, ?)')
+      .run(userId, trimmedText);
+
+    const userRow = db.prepare('SELECT name, profile_picture FROM users WHERE id = ?').get(userId) as UserRow;
+    const insertedRow = db.prepare('SELECT created_at FROM roadmap_chat_messages WHERE id = ?').get(result.lastInsertRowid) as { created_at: string };
+
+    const chatMessage: RoadmapChatMessage = {
+      id: Number(result.lastInsertRowid),
+      senderId: userId,
+      senderName: userRow?.name || 'User',
+      senderAvatar: userRow?.profile_picture || null,
+      text: trimmedText,
+      createdAt: insertedRow.created_at,
+    };
+
+    broadcastChatMessage(chatMessage);
+
+    res.status(201).json({
+      message: 'Message sent successfully',
+      chatMessage,
+    });
+  } catch (err: unknown) {
+    console.error('Error sending chat message:', err);
+    res.status(500).json({ message: 'Failed to send chat message' });
   }
 });
 

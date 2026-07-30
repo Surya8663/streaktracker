@@ -150,6 +150,16 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_roadmap_source_links_source ON roadmap_source_links(source_id);
+
+  CREATE TABLE IF NOT EXISTS roadmap_chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_roadmap_chat_created ON roadmap_chat_messages(created_at);
 `);
 
 // Ensure bio, github_url, linkedin_url columns exist for existing databases

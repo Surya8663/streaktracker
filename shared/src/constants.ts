@@ -12,6 +12,7 @@ export const API_ROUTES = {
   ROADMAP_MONTH1: '/api/roadmap/month1',
   ROADMAP_TASKS: '/api/roadmap/tasks',
   ROADMAP_SOURCES: '/api/roadmap/sources',
+  ROADMAP_CHAT: '/api/roadmap/chat',
   PROFILE: '/api/profile',
   UPLOAD_AVATAR: '/api/profile/avatar',
 } as const;
@@ -24,6 +25,7 @@ export const SOCKET_EVENTS = {
   PRESENCE_UPDATE: 'presence:update',
   MILESTONE_COMPLETED: 'milestone:completed',
   ROADMAP_UPDATED: 'roadmap:updated',
+  CHAT_MESSAGE: 'chat:message',
 } as const;
 
 // ── App Metadata ─────────────────────────────────────────────
