@@ -26,6 +26,8 @@ db.exec(`
     password_hash TEXT NOT NULL,
     profile_picture TEXT,
     bio TEXT DEFAULT 'Target: Product-based MNC as SDE 🎯',
+    github_url TEXT,
+    linkedin_url TEXT,
     join_date TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -70,6 +72,25 @@ db.exec(`
   );
 `);
 
+// Ensure bio, github_url, linkedin_url columns exist for existing databases
+try {
+  db.exec("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT 'Target: Product-based MNC as SDE 🎯'");
+} catch {
+  // Column already exists
+}
+
+try {
+  db.exec('ALTER TABLE users ADD COLUMN github_url TEXT');
+} catch {
+  // Column already exists
+}
+
+try {
+  db.exec('ALTER TABLE users ADD COLUMN linkedin_url TEXT');
+} catch {
+  // Column already exists
+}
+
 // Seed default 6-month roadmap phases if empty
 const count = (db.prepare('SELECT COUNT(*) as count FROM roadmap_phases').get() as { count: number }).count;
 if (count === 0) {
@@ -87,23 +108,31 @@ if (count === 0) {
 const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
 if (userCount === 0) {
   const insertUser = db.prepare(
-    'INSERT INTO users (name, email, password_hash, profile_picture, bio) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO users (name, email, password_hash, profile_picture, bio, github_url, linkedin_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
   );
   const suryaHash = bcrypt.hashSync('surya123', 10);
   const gomathiHash = bcrypt.hashSync('gomathi123', 10);
-  insertUser.run('Surya', 'surya@streaktrack.app', suryaHash, '/avatars/surya.jpg', 'Target: Product-based MNC as SDE 🎯');
-  insertUser.run('Gomathi', 'gomathi@streaktrack.app', gomathiHash, '/avatars/gomathi.jpg', 'Target: Product-based MNC as SDE 🎯');
+  insertUser.run(
+    'Surya',
+    'surya@streaktrack.app',
+    suryaHash,
+    '/avatars/surya.jpg',
+    'Target: Product-based MNC as SDE 🎯',
+    'https://github.com/Surya8663',
+    'https://www.linkedin.com/in/g-surya-63a01b290/',
+  );
+  insertUser.run(
+    'Gomathi',
+    'gomathi@streaktrack.app',
+    gomathiHash,
+    '/avatars/gomathi.jpg',
+    'Target: Product-based MNC as SDE 🎯',
+    'https://github.com/gopika-repo',
+    'https://www.linkedin.com/in/gomathi-dhandapani-47435b350/',
+  );
   console.log('[db] Auto-seeded default users: Surya & Gomathi');
-}
-
-// Ensure bio column exists for existing databases
-try {
-  db.exec("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT 'Target: Product-based MNC as SDE 🎯'");
-} catch {
-  // Column already exists
 }
 
 console.log(`[db] SQLite connected: ${DB_PATH}`);
 
 export default db;
-

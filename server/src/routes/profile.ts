@@ -46,6 +46,8 @@ interface UserRow {
   email: string;
   profile_picture: string | null;
   bio: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
   join_date: string;
 }
 
@@ -54,7 +56,7 @@ router.get(`${API_ROUTES.PROFILE}/:userId`, requireAuth, (req, res) => {
   const userId = parseInt(String(req.params.userId), 10);
 
   const userRow = db
-    .prepare('SELECT id, name, email, profile_picture, bio, join_date FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, profile_picture, bio, github_url, linkedin_url, join_date FROM users WHERE id = ?')
     .get(userId) as UserRow | undefined;
 
   if (!userRow) {
@@ -69,6 +71,8 @@ router.get(`${API_ROUTES.PROFILE}/:userId`, requireAuth, (req, res) => {
     profilePicture: userRow.profile_picture,
     joinDate: userRow.join_date,
     bio: userRow.bio || 'Target: Product-based MNC as SDE 🎯',
+    githubUrl: userRow.github_url,
+    linkedinUrl: userRow.linkedin_url,
   };
 
   // Fetch all daily logs to calculate lifetime stats
@@ -118,24 +122,28 @@ router.get(`${API_ROUTES.PROFILE}/:userId`, requireAuth, (req, res) => {
 // ── PUT /api/profile ─────────────────────────────────────────
 router.put(API_ROUTES.PROFILE, requireAuth, (req, res) => {
   const userId = req.user!.id;
-  const { bio, name } = req.body as UpdateProfileRequest;
+  const { bio, name, githubUrl, linkedinUrl } = req.body as UpdateProfileRequest;
 
   try {
     const current = db
-      .prepare('SELECT name, bio FROM users WHERE id = ?')
-      .get(userId) as { name: string; bio: string | null };
+      .prepare('SELECT name, bio, github_url, linkedin_url FROM users WHERE id = ?')
+      .get(userId) as { name: string; bio: string | null; github_url: string | null; linkedin_url: string | null };
 
     const newBio = bio !== undefined ? bio.trim() : current.bio;
     const newName = name !== undefined ? name.trim() : current.name;
+    const newGithubUrl = githubUrl !== undefined ? (githubUrl ? githubUrl.trim() : null) : current.github_url;
+    const newLinkedinUrl = linkedinUrl !== undefined ? (linkedinUrl ? linkedinUrl.trim() : null) : current.linkedin_url;
 
-    db.prepare('UPDATE users SET bio = ?, name = ? WHERE id = ?').run(
+    db.prepare('UPDATE users SET bio = ?, name = ?, github_url = ?, linkedin_url = ? WHERE id = ?').run(
       newBio,
       newName,
+      newGithubUrl,
+      newLinkedinUrl,
       userId,
     );
 
     const updatedUser = db
-      .prepare('SELECT id, name, email, profile_picture, bio, join_date FROM users WHERE id = ?')
+      .prepare('SELECT id, name, email, profile_picture, bio, github_url, linkedin_url, join_date FROM users WHERE id = ?')
       .get(userId) as UserRow;
 
     res.json({
@@ -147,6 +155,8 @@ router.put(API_ROUTES.PROFILE, requireAuth, (req, res) => {
         profilePicture: updatedUser.profile_picture,
         joinDate: updatedUser.join_date,
         bio: updatedUser.bio,
+        githubUrl: updatedUser.github_url,
+        linkedinUrl: updatedUser.linkedin_url,
       },
     });
   } catch (err: unknown) {

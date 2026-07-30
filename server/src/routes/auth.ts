@@ -14,6 +14,8 @@ interface DBUserRow {
   password_hash: string;
   profile_picture: string | null;
   bio: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
   join_date: string;
 }
 
@@ -27,7 +29,7 @@ router.post(API_ROUTES.AUTH_LOGIN, (req, res) => {
   }
 
   const row = db
-    .prepare('SELECT id, name, email, password_hash, profile_picture, bio, join_date FROM users WHERE email = ?')
+    .prepare('SELECT id, name, email, password_hash, profile_picture, bio, github_url, linkedin_url, join_date FROM users WHERE email = ?')
     .get(email) as DBUserRow | undefined;
 
   if (!row) {
@@ -50,6 +52,8 @@ router.post(API_ROUTES.AUTH_LOGIN, (req, res) => {
     profilePicture: row.profile_picture,
     joinDate: row.join_date,
     bio: row.bio || 'Target: Product-based MNC as SDE 🎯',
+    githubUrl: row.github_url,
+    linkedinUrl: row.linkedin_url,
   };
 
   const response: LoginResponse = { user, message: 'Login successful' };
@@ -82,7 +86,7 @@ router.post(API_ROUTES.AUTH_LOGOUT, (_req, res) => {
 // ── GET /api/auth/me ─────────────────────────────────────────
 router.get(API_ROUTES.AUTH_ME, requireAuth, (req, res) => {
   const row = db
-    .prepare('SELECT id, name, email, profile_picture, bio, join_date FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, profile_picture, bio, github_url, linkedin_url, join_date FROM users WHERE id = ?')
     .get(req.user!.id) as DBUserRow | undefined;
 
   if (!row) {
@@ -97,6 +101,8 @@ router.get(API_ROUTES.AUTH_ME, requireAuth, (req, res) => {
     profilePicture: row.profile_picture,
     joinDate: row.join_date,
     bio: row.bio || 'Target: Product-based MNC as SDE 🎯',
+    githubUrl: row.github_url,
+    linkedinUrl: row.linkedin_url,
   };
 
   res.json({ user });

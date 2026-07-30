@@ -8,6 +8,7 @@ import { RecentLogsList } from '../components/RecentLogsList';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { TreatBadge } from '../components/TreatBadge';
 import { AnimatedCounter } from '../components/AnimatedCounter';
+import { ProfileCard } from '../components/ProfileCard';
 import { ComparisonDashboardPage } from './ComparisonDashboardPage';
 import { MilestonesPage } from './MilestonesPage';
 import { RoadmapPage } from './RoadmapPage';
@@ -429,8 +430,11 @@ export const HomePage: React.FC = () => {
                   </section>
                 </div>
 
-                {/* ── Right Sidebar (4 cols): TreatBadge & Personal Streak Calendar ── */}
+                {/* ── Right Sidebar (4 cols): ProfileCard, TreatBadge & Personal Streak Calendar ── */}
                 <div className="lg:col-span-4 space-y-8">
+                  {/* Profile Card with GitHub & LinkedIn Links */}
+                  <ProfileCard user={user} isOnline={userIsOnline} />
+
                   {/* Treat Badge */}
                   <TreatBadge
                     otherUserName={otherUserName}

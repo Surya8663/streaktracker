@@ -13,6 +13,8 @@ export interface User {
   profilePicture: string | null;
   joinDate: string;
   bio: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
 }
 
 export interface ProfileStatsResponse {
@@ -27,6 +29,8 @@ export interface ProfileStatsResponse {
 export interface UpdateProfileRequest {
   bio?: string;
   name?: string;
+  githubUrl?: string;
+  linkedinUrl?: string;
 }
 
 // ── Auth ─────────────────────────────────────────────────────

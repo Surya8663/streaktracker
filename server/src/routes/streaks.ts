@@ -13,13 +13,15 @@ interface DBUserRow {
   email: string;
   profile_picture: string | null;
   bio: string | null;
+  github_url: string | null;
+  linkedin_url: string | null;
   join_date: string;
 }
 
 // ── GET /api/users ───────────────────────────────────────────
 router.get(API_ROUTES.USERS, requireAuth, (_req, res) => {
   const rows = db
-    .prepare('SELECT id, name, email, profile_picture, bio, join_date FROM users ORDER BY id ASC')
+    .prepare('SELECT id, name, email, profile_picture, bio, github_url, linkedin_url, join_date FROM users ORDER BY id ASC')
     .all() as DBUserRow[];
 
   const users: User[] = rows.map((r) => ({
@@ -29,6 +31,8 @@ router.get(API_ROUTES.USERS, requireAuth, (_req, res) => {
     profilePicture: r.profile_picture,
     joinDate: r.join_date,
     bio: r.bio || 'Target: Product-based MNC as SDE 🎯',
+    githubUrl: r.github_url,
+    linkedinUrl: r.linkedin_url,
   }));
 
   res.json({ users });
@@ -39,7 +43,7 @@ router.get(`${API_ROUTES.STREAKS}/:userId`, requireAuth, (req, res) => {
   const userId = parseInt(String(req.params.userId), 10);
 
   const userRow = db
-    .prepare('SELECT id, name, email, profile_picture, bio, join_date FROM users WHERE id = ?')
+    .prepare('SELECT id, name, email, profile_picture, bio, github_url, linkedin_url, join_date FROM users WHERE id = ?')
     .get(userId) as DBUserRow | undefined;
 
   if (!userRow) {
@@ -54,6 +58,8 @@ router.get(`${API_ROUTES.STREAKS}/:userId`, requireAuth, (req, res) => {
     profilePicture: userRow.profile_picture,
     joinDate: userRow.join_date,
     bio: userRow.bio || 'Target: Product-based MNC as SDE 🎯',
+    githubUrl: userRow.github_url,
+    linkedinUrl: userRow.linkedin_url,
   };
 
   const logRows = db

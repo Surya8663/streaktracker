@@ -19,34 +19,38 @@ const users = [
     email: 'surya@streaktrack.app',
     password: 'surya123',
     profile_picture: '/avatars/surya.jpg',
+    github_url: 'https://github.com/Surya8663',
+    linkedin_url: 'https://www.linkedin.com/in/g-surya-63a01b290/',
   },
   {
     name: 'Gomathi',
     email: 'gomathi@streaktrack.app',
     password: 'gomathi123',
     profile_picture: '/avatars/gomathi.jpg',
+    github_url: 'https://github.com/gopika-repo',
+    linkedin_url: 'https://www.linkedin.com/in/gomathi-dhandapani-47435b350/',
   },
 ];
 
-console.log('\n🌱 Seeding users and updating profile pictures...\n');
+console.log('\n🌱 Seeding users and updating social profiles...\n');
 
 const insertUser = db.prepare(
-  'INSERT OR IGNORE INTO users (name, email, password_hash, profile_picture) VALUES (?, ?, ?, ?)',
+  'INSERT OR IGNORE INTO users (name, email, password_hash, profile_picture, github_url, linkedin_url) VALUES (?, ?, ?, ?, ?, ?)',
 );
 
-const updateUserPicture = db.prepare(
-  'UPDATE users SET profile_picture = ? WHERE email = ?',
+const updateUserSocials = db.prepare(
+  'UPDATE users SET profile_picture = ?, github_url = ?, linkedin_url = ? WHERE email = ?',
 );
 
 for (const user of users) {
   const hash = bcrypt.hashSync(user.password, SALT_ROUNDS);
-  const result = insertUser.run(user.name, user.email, hash, user.profile_picture);
+  const result = insertUser.run(user.name, user.email, hash, user.profile_picture, user.github_url, user.linkedin_url);
 
   if (result.changes > 0) {
     console.log(`  ✅ Created: ${user.name} <${user.email}>`);
   } else {
-    updateUserPicture.run(user.profile_picture, user.email);
-    console.log(`  🔄 Updated: ${user.name} <${user.email}> profile picture set to ${user.profile_picture}`);
+    updateUserSocials.run(user.profile_picture, user.github_url, user.linkedin_url, user.email);
+    console.log(`  🔄 Updated: ${user.name} <${user.email}> GitHub/LinkedIn links set.`);
   }
 }
 
@@ -65,11 +69,6 @@ const insertLog = db.prepare(
 );
 
 // ── Extended logs: 18 days to create 3 completed 5-day blocks + current block
-// Block 1: days 18-14 ago (completed)
-// Block 2: days 13-9 ago  (completed)
-// Block 3: days 8-4 ago   (completed)
-// Current block: days 3-0  (in progress)
-
 const suryaLogs = [
   // Block 1 (days 18-14)
   { daysAgo: 18, hours: 3.0, topics: 'JavaScript fundamentals & closures', notes: 'Reviewed scope chain and closures deeply.' },
