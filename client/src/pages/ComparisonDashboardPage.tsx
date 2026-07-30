@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import type { StreakResponse, User, LogUpdatedPayload, MilestoneResponse, DailyLog } from '@streaktrack/shared';
+import confetti from 'canvas-confetti';
+import toast from 'react-hot-toast';
+import type { StreakResponse, User, LogUpdatedPayload, MilestoneResponse, DailyLog, MilestoneWonPayload } from '@streaktrack/shared';
 import { API_ROUTES, SOCKET_EVENTS } from '@streaktrack/shared';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { Avatar } from '../components/Avatar';
 import { AnimatedCounter } from '../components/AnimatedCounter';
+import { TreatBadge } from '../components/TreatBadge';
 import { useSocket } from '../context/SocketContext';
 import { getApiUrl } from '../utils/api.js';
 
@@ -182,9 +185,34 @@ export const ComparisonDashboardPage: React.FC = () => {
       loadAllStreaks();
     };
 
+    const handleMilestoneCompleted = (payload: MilestoneWonPayload) => {
+      loadAllStreaks();
+      const winnerName = payload.milestone.winnerName || 'Someone';
+
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+      });
+
+      toast.success(`🎉 ${winnerName} won this block!`, {
+        duration: 6000,
+        position: 'top-center',
+        style: {
+          borderRadius: '16px',
+          background: '#0f172a',
+          color: '#fff',
+          fontWeight: 'bold',
+        },
+      });
+    };
+
     socket.on(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdate);
+    socket.on(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
+
     return () => {
       socket.off(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdate);
+      socket.off(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
     };
   }, [socket, loadAllStreaks]);
 
@@ -229,6 +257,108 @@ export const ComparisonDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* ── Current Battle Banner ────────────────────────────── */}
+      {milestoneData?.currentBlock && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="rounded-3xl border border-amber-200/80 bg-gradient-to-r from-amber-500/10 via-amber-100/30 to-orange-50/60 p-6 sm:p-7 shadow-sm space-y-4 relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Block & Days Remaining */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="rounded-full bg-amber-400/30 text-amber-950 text-xs font-black px-3 py-0.5 border border-amber-300/50 shadow-2xs">
+                  ⚔️ 5-Day Block #{milestoneData.currentBlock.blockNumber}
+                </span>
+                <span className="text-xs font-extrabold text-amber-900 bg-white/80 px-2.5 py-0.5 rounded-full border border-amber-200/60 shadow-2xs">
+                  ⏳ {milestoneData.currentBlock.daysRemaining} {milestoneData.currentBlock.daysRemaining === 1 ? 'day' : 'days'} left
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Current Battle Status
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 mt-0.5 font-medium">
+                Active Block: {milestoneData.currentBlock.startDate} to {milestoneData.currentBlock.endDate}
+              </p>
+            </div>
+
+            {/* Leading Status Indicator */}
+            <div className="flex items-center gap-3 bg-white/95 p-3.5 sm:p-4 rounded-2xl border border-amber-200/80 shadow-2xs backdrop-blur-xs">
+              {(() => {
+                const cb = milestoneData.currentBlock;
+                const u1Name = cb.user1Name;
+                const u2Name = cb.user2Name;
+                const u1Hours = cb.user1Hours;
+                const u2Hours = cb.user2Hours;
+
+                if (u1Hours === u2Hours) {
+                  return (
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">🤝</span>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Status</p>
+                        <p className="text-sm font-black text-slate-800">Dead Heat — Tied ({u1Hours.toFixed(1)} hrs)</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const leadingName = u1Hours > u2Hours ? u1Name : u2Name;
+                const leadingHours = u1Hours > u2Hours ? u1Hours : u2Hours;
+                const trailingHours = u1Hours > u2Hours ? u2Hours : u1Hours;
+                const leadDiff = (leadingHours - trailingHours).toFixed(1);
+                const isSuryaLeading = u1Hours > u2Hours;
+
+                return (
+                  <div className="flex items-center gap-3">
+                    <motion.div
+                      animate={{ scale: [1, 1.15, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                      className="text-2xl shrink-0"
+                    >
+                      🔥
+                    </motion.div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          isSuryaLeading ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                        }`}>
+                          Leading Now 👑
+                        </span>
+                      </div>
+                      <p className="text-sm font-black text-slate-800 mt-0.5">
+                        {leadingName} (+{leadDiff} hrs ahead)
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Treat Badges Section if either user owes a treat */}
+          {milestoneData.treatScoreboard && milestoneData.treatScoreboard.some((t) => t.treatsOwed > 0) && (
+            <div className="pt-3 border-t border-amber-200/50 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {milestoneData.treatScoreboard.map((t) => {
+                if (t.treatsOwed <= 0) return null;
+                const recipientName = suryaStreak && gomathiStreak
+                  ? (t.userId === suryaStreak.user.id ? gomathiStreak.user.name : suryaStreak.user.name)
+                  : 'Friend';
+                return (
+                  <TreatBadge
+                    key={`treat-${t.userId}`}
+                    otherUserName={recipientName}
+                    treatsOwedCount={t.treatsOwed}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* ── VS Hero Section ───────────────────────────────────── */}
       {suryaStreak && gomathiStreak && (
         <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-2">
