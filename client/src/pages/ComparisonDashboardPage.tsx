@@ -92,13 +92,139 @@ export const ComparisonDashboardPage: React.FC = () => {
     }
   });
 
+  // Find Surya and Gomathi streaks
+  const suryaStreak = streaks.find((s) => s.user.name.toLowerCase().includes('surya')) || streaks[0];
+  const gomathiStreak = streaks.find((s) => s.user.name.toLowerCase().includes('gomathi')) || (streaks.length > 1 ? streaks[1] : null);
+
+  const isSuryaLeading = suryaStreak && gomathiStreak && suryaStreak.currentStreak > gomathiStreak.currentStreak;
+  const isGomathiLeading = suryaStreak && gomathiStreak && gomathiStreak.currentStreak > suryaStreak.currentStreak;
+
   return (
     <div className="space-y-8">
+      {/* ── VS Hero Section ───────────────────────────────────── */}
+      {suryaStreak && gomathiStreak && (
+        <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 py-2">
+          {/* Left Card: Surya */}
+          <motion.div
+            initial={{ opacity: 0, x: -60 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: 'spring', stiffness: 90, damping: 15 }}
+            className={`relative flex-1 w-full flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+              isSuryaLeading
+                ? 'bg-gradient-to-br from-amber-500/15 via-amber-100/50 to-orange-50/90 border-amber-300/90 shadow-md ring-2 ring-amber-400/40'
+                : 'bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+            }`}
+          >
+            {/* Leading Crown Badge */}
+            {isSuryaLeading && (
+              <motion.div
+                initial={{ scale: 0, y: 10, rotate: -15 }}
+                animate={{ scale: 1, y: 0, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
+                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-amber-200 ring-2 ring-amber-300/50 z-10"
+              >
+                <span>👑</span> Leading
+              </motion.div>
+            )}
+
+            {/* Avatar Container with glowing ring if leading */}
+            <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
+              isSuryaLeading ? 'ring-4 ring-amber-400/80 shadow-lg shadow-amber-400/30' : ''
+            }`}>
+              <Avatar
+                name={suryaStreak.user.name}
+                src={suryaStreak.user.profilePicture}
+                size="xl"
+                showStatus
+                isOnline={isOnline(suryaStreak.user.id)}
+              />
+            </div>
+
+            {/* Name */}
+            <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
+              {suryaStreak.user.name}
+            </h3>
+
+            {/* Current Streak Counter */}
+            <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-amber-800 bg-amber-100/90 px-4 py-1 rounded-full border border-amber-200/80 shadow-xs">
+              <span className="text-base">🔥</span>
+              <AnimatedCounter value={suryaStreak.currentStreak} />
+              <span>{suryaStreak.currentStreak === 1 ? 'day' : 'days'}</span>
+            </div>
+          </motion.div>
+
+          {/* Center VS Badge */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.35 }}
+            className="z-10 -my-3 sm:my-0 flex items-center justify-center shrink-0"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-teal-500 text-white font-black text-lg flex items-center justify-center shadow-lg shadow-rose-500/30 ring-4 ring-white border border-white/50"
+            >
+              VS
+            </motion.div>
+          </motion.div>
+
+          {/* Right Card: Gomathi */}
+          <motion.div
+            initial={{ opacity: 0, x: 60 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: 'spring', stiffness: 90, damping: 15 }}
+            className={`relative flex-1 w-full flex flex-col items-center justify-center p-6 sm:p-7 rounded-3xl border text-center transition-all duration-300 ${
+              isGomathiLeading
+                ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-100/50 to-teal-50/90 border-emerald-300/90 shadow-md ring-2 ring-emerald-400/40'
+                : 'bg-gradient-to-br from-emerald-50/70 via-teal-50/40 to-stone-50 border-stone-200/80 shadow-xs'
+            }`}
+          >
+            {/* Leading Crown Badge */}
+            {isGomathiLeading && (
+              <motion.div
+                initial={{ scale: 0, y: 10, rotate: 15 }}
+                animate={{ scale: 1, y: 0, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 220, damping: 12, delay: 0.4 }}
+                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-400 text-emerald-950 font-black text-xs px-3.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-emerald-200 ring-2 ring-emerald-300/50 z-10"
+              >
+                <span>👑</span> Leading
+              </motion.div>
+            )}
+
+            {/* Avatar Container with glowing ring if leading */}
+            <div className={`relative p-1.5 rounded-full transition-all duration-300 ${
+              isGomathiLeading ? 'ring-4 ring-emerald-400/80 shadow-lg shadow-emerald-400/30' : ''
+            }`}>
+              <Avatar
+                name={gomathiStreak.user.name}
+                src={gomathiStreak.user.profilePicture}
+                size="xl"
+                showStatus
+                isOnline={isOnline(gomathiStreak.user.id)}
+              />
+            </div>
+
+            {/* Name */}
+            <h3 className="mt-3 text-lg font-extrabold text-slate-800 tracking-tight">
+              {gomathiStreak.user.name}
+            </h3>
+
+            {/* Current Streak Counter */}
+            <div className="mt-1.5 flex items-center gap-1.5 text-sm font-extrabold text-emerald-800 bg-emerald-100/90 px-4 py-1 rounded-full border border-emerald-200/80 shadow-xs">
+              <span className="text-base">🔥</span>
+              <AnimatedCounter value={gomathiStreak.currentStreak} />
+              <span>{gomathiStreak.currentStreak === 1 ? 'day' : 'days'}</span>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Comparison Overview Card */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
         className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-6 sm:p-8 text-white shadow-lg"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
