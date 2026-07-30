@@ -7,7 +7,7 @@ interface TreatBadgeProps {
   onClick?: () => void;
 }
 
-export const TreatBadge: React.FC<TreatBadgeProps> = ({
+export const TreatBadge: React.FC<TreatBadgeProps> = React.memo(({
   otherUserName,
   treatsOwedCount,
   onClick,
@@ -54,4 +54,5 @@ export const TreatBadge: React.FC<TreatBadgeProps> = ({
       </div>
     </motion.div>
   );
-};
+});
+

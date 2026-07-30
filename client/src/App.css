@@ -23,9 +23,9 @@
     @apply transition-all duration-150 ease-in-out active:scale-[0.97];
   }
 
-  /* Glass card style */
+  /* Glass card style (Optimized: semi-transparent white without composite blur layers) */
   .glass-card {
-    @apply bg-white/80 backdrop-blur-md border border-stone-200/60 rounded-3xl shadow-sm;
+    @apply bg-white/95 border border-stone-200/60 rounded-3xl shadow-sm;
   }
 
   /* Scrollbar styling for calendar grids */
@@ -45,15 +45,15 @@
   }
 }
 
-/* ── Micro-animation Keyframes ───────────────────────────────── */
+/* ── Micro-animation Keyframes (GPU hardware accelerated) ───── */
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(20, 184, 166, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.6); }
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
 }
 
 @keyframes shimmer {
@@ -63,14 +63,24 @@
 
 .animate-float {
   animation: float 3s ease-in-out infinite;
+  will-change: transform;
 }
 
 .animate-glow-pulse {
   animation: glow-pulse 2s ease-in-out infinite;
+  will-change: opacity;
 }
 
 .animate-shimmer {
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-glow-pulse,
+  .animate-shimmer {
+    animation: none !important;
+  }
 }

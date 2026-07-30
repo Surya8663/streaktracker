@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
@@ -100,7 +100,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [user]);
 
-  const isOnline = (targetUserId: number) => onlineUserIds.includes(targetUserId);
+  const isOnline = useCallback(
+    (targetUserId: number) => onlineUserIds.includes(targetUserId),
+    [onlineUserIds]
+  );
 
   return (
     <SocketContext.Provider value={{ socket, onlineUserIds, isOnline }}>

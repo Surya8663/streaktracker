@@ -7,7 +7,7 @@ interface RecentLogsListProps {
   onSelectLogForEdit?: (log: DailyLog) => void;
 }
 
-export const RecentLogsList: React.FC<RecentLogsListProps> = ({ logs, onSelectLogForEdit }) => {
+export const RecentLogsList: React.FC<RecentLogsListProps> = React.memo(({ logs, onSelectLogForEdit }) => {
   const formatDate = (dateStr: string) => {
     // Parse YYYY-MM-DD cleanly
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -108,4 +108,5 @@ export const RecentLogsList: React.FC<RecentLogsListProps> = ({ logs, onSelectLo
       )}
     </div>
   );
-};
+});
+

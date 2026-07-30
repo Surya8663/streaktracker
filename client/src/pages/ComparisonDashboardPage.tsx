@@ -105,7 +105,7 @@ const StatRow: React.FC<StatRowProps> = ({ title, icon, val1, val2, unit = '', d
         </motion.div>
 
         {/* Center Divider indicator */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-white/70 backdrop-blur-xs z-10 shadow-xs" />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-white/90 z-10 shadow-xs" />
       </div>
     </div>
   );
@@ -312,7 +312,7 @@ export const ComparisonDashboardPage: React.FC = () => {
             </div>
 
             {/* Leading Status Indicator */}
-            <div className="flex items-center gap-3 bg-white/95 p-3.5 sm:p-4 rounded-2xl border border-amber-200/80 shadow-2xs backdrop-blur-xs">
+            <div className="flex items-center gap-3 bg-white/95 p-3.5 sm:p-4 rounded-2xl border border-amber-200/80 shadow-2xs">
               {(() => {
                 const cb = milestoneData.currentBlock;
                 const u1Name = cb.user1Name;

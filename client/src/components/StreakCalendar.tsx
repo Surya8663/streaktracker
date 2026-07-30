@@ -9,7 +9,7 @@ interface StreakCalendarProps {
   isOnline?: boolean;
 }
 
-export const StreakCalendar: React.FC<StreakCalendarProps> = ({ data, isOnline = false }) => {
+export const StreakCalendar: React.FC<StreakCalendarProps> = React.memo(({ data, isOnline = false }) => {
   const { user, currentStreak, longestStreak, totalHours, calendarData } = data;
   const [hoveredDay, setHoveredDay] = useState<{
     day: StreakDay;
@@ -162,7 +162,7 @@ export const StreakCalendar: React.FC<StreakCalendarProps> = ({ data, isOnline =
               top: hoveredDay.y - 12,
               transform: 'translate(-50%, -100%)',
             }}
-            className="pointer-events-none z-50 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white shadow-xl backdrop-blur-md max-w-xs"
+            className="pointer-events-none z-50 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white shadow-xl max-w-xs"
           >
             <p className="font-bold text-slate-200 mb-0.5">
               {formatDate(hoveredDay.day.date)}
@@ -186,4 +186,5 @@ export const StreakCalendar: React.FC<StreakCalendarProps> = ({ data, isOnline =
       </AnimatePresence>
     </div>
   );
-};
+});
+

@@ -113,7 +113,7 @@ export const RoadmapPage: React.FC = () => {
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
-            <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-indigo-300 backdrop-blur-md mb-2 border border-white/10">
+            <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-indigo-300 mb-2 border border-white/10">
               🎓 6-Month Placement Season Countdown
             </span>
             <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
@@ -126,11 +126,11 @@ export const RoadmapPage: React.FC = () => {
 
           {/* Start/End Date Badges */}
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white/10 px-4 py-3 border border-white/10 backdrop-blur-md text-right">
+            <div className="rounded-2xl bg-white/10 px-4 py-3 border border-white/10 text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">Started</p>
               <p className="text-sm font-extrabold text-white">{progress.startDate}</p>
             </div>
-            <div className="rounded-2xl bg-amber-400/20 px-4 py-3 border border-amber-300/30 backdrop-blur-md text-right">
+            <div className="rounded-2xl bg-amber-400/20 px-4 py-3 border border-amber-300/30 text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider text-amber-200">Target Season</p>
               <p className="text-sm font-extrabold text-amber-100">{progress.targetEndDate}</p>
             </div>
@@ -340,7 +340,7 @@ export const RoadmapPage: React.FC = () => {
       {/* Edit Phase Modal */}
       <AnimatePresence>
         {editingPhase && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

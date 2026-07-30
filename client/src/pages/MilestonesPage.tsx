@@ -113,12 +113,12 @@ export const MilestonesPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-amber-100 backdrop-blur-md">
+              <span className="inline-block rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-amber-100">
                 🏆 Healthy Competition Scoreboard
               </span>
               <button
                 onClick={triggerTestConfetti}
-                className="cursor-pointer rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white transition-all hover:bg-white/30 backdrop-blur-md"
+                className="cursor-pointer rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white transition-all hover:bg-white/30"
               >
                 🎉 Confetti Test
               </button>
@@ -138,7 +138,7 @@ export const MilestonesPage: React.FC = () => {
               return (
                 <div
                   key={score.userId}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 backdrop-blur-md border ${
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 border ${
                     isCurrentUser && score.treatsOwed > 0
                       ? 'bg-amber-950/30 border-amber-300/40'
                       : 'bg-white/15 border-white/20'

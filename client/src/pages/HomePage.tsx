@@ -33,16 +33,16 @@ const TAB_CONFIG: { id: Tab; label: string; icon: string }[] = [
   { id: 'profile', label: 'Profile', icon: '👤' },
 ];
 
+// Single fast fade transition (150ms, no transform jitter)
 const pageVariants = {
-  initial: { opacity: 0, y: 16, scale: 0.99 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: -10, scale: 0.99 },
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 const pageTransition = {
-  type: 'tween',
-  ease: 'easeInOut',
-  duration: 0.25,
+  duration: 0.15,
+  ease: 'linear',
 };
 
 export const HomePage: React.FC = () => {
@@ -56,7 +56,7 @@ export const HomePage: React.FC = () => {
   const [milestoneData, setMilestoneData] = useState<MilestoneResponse | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
-  // Fetch logs, personal streak stats, and milestone treats for current user
+  // Fetch initial user data
   const fetchUserData = useCallback(async () => {
     if (!user) return;
     try {
@@ -87,26 +87,67 @@ export const HomePage: React.FC = () => {
     }
   }, [user]);
 
+  // Granular fetch helpers to avoid heavy re-fetches
+  const fetchStreakOnly = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(getApiUrl(`${API_ROUTES.STREAKS}/${user.id}`), { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setPersonalStreak(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch streak', err);
+    }
+  }, [user]);
+
+  const fetchMilestonesOnly = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl(API_ROUTES.MILESTONES), { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setMilestoneData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch milestones', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
 
-  // Listen to socket log update & milestone events
+  // Optimized socket event handlers (update state locally & fetch targeted resource)
   useEffect(() => {
     if (!socket) return;
 
-    const handleRefresh = () => {
-      fetchUserData();
+    const handleLogUpdated = (payload: LogUpdatedPayload) => {
+      if (user && payload.userId === user.id) {
+        setLogs((prev) => {
+          const existingIdx = prev.findIndex((l) => l.id === payload.log.id || l.date === payload.log.date);
+          if (existingIdx >= 0) {
+            const updated = [...prev];
+            updated[existingIdx] = payload.log;
+            return updated;
+          }
+          return [payload.log, ...prev];
+        });
+        fetchStreakOnly();
+      }
     };
 
-    socket.on(SOCKET_EVENTS.LOG_UPDATED, handleRefresh);
-    socket.on(SOCKET_EVENTS.MILESTONE_COMPLETED, handleRefresh);
+    const handleMilestoneCompleted = () => {
+      fetchMilestonesOnly();
+    };
+
+    socket.on(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
+    socket.on(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
 
     return () => {
-      socket.off(SOCKET_EVENTS.LOG_UPDATED, handleRefresh);
-      socket.off(SOCKET_EVENTS.MILESTONE_COMPLETED, handleRefresh);
+      socket.off(SOCKET_EVENTS.LOG_UPDATED, handleLogUpdated);
+      socket.off(SOCKET_EVENTS.MILESTONE_COMPLETED, handleMilestoneCompleted);
     };
-  }, [socket, user, fetchUserData]);
+  }, [socket, user, fetchStreakOnly, fetchMilestonesOnly]);
 
   const todayStr = getTodayString();
   const todayLog = logs.find((l) => l.date === todayStr) || null;
@@ -121,7 +162,7 @@ export const HomePage: React.FC = () => {
       }
       return [savedLog, ...prev];
     });
-    fetchUserData();
+    fetchStreakOnly();
   };
 
   const switchTab = (tab: Tab) => {
@@ -138,8 +179,8 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 text-slate-800">
-      {/* ═══ Top Navigation Bar ═══ */}
-      <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-white/85 backdrop-blur-xl">
+      {/* ═══ Top Navigation Bar (Single Sticky Blur Header) ═══ */}
+      <header className="sticky top-0 z-30 border-b border-stone-200/80 bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-3">
           {/* Brand */}
           <div className="flex items-center gap-2.5 shrink-0">
@@ -209,7 +250,7 @@ export const HomePage: React.FC = () => {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               className="md:hidden overflow-hidden border-t border-stone-200/60 bg-white"
             >
               <div className="px-4 py-3 space-y-1">
@@ -233,7 +274,7 @@ export const HomePage: React.FC = () => {
         </AnimatePresence>
       </header>
 
-      {/* ═══ Main Content with Page Transitions ═══ */}
+      {/* ═══ Main Content with Fast Single-Fade Page Transitions ═══ */}
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
         <AnimatePresence mode="wait">
           {activeTab === 'log' && (
@@ -247,12 +288,7 @@ export const HomePage: React.FC = () => {
               className="space-y-6 sm:space-y-8"
             >
               {/* Profile Welcome Banner */}
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="glass-card p-5 sm:p-8"
-              >
+              <div className="glass-card p-5 sm:p-8">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
                   <div className="flex items-center gap-4 sm:gap-5 cursor-pointer" onClick={() => switchTab('profile')}>
                     <Avatar name={user?.name || ''} src={user?.profilePicture} size="xl" showStatus isOnline={userIsOnline} />
@@ -279,7 +315,7 @@ export const HomePage: React.FC = () => {
                     </span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
 
               {/* Treat Badge */}
               <TreatBadge
@@ -290,30 +326,18 @@ export const HomePage: React.FC = () => {
 
               {/* Personal Streak Calendar */}
               {personalStreak && (
-                <motion.section
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.05 }}
-                >
+                <section>
                   <StreakCalendar data={personalStreak} isOnline={userIsOnline} />
-                </motion.section>
+                </section>
               )}
 
               {/* Daily Log Form */}
-              <motion.section
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-              >
+              <section>
                 <DailyLogForm todayLog={todayLog} onLogSaved={handleLogSaved} />
-              </motion.section>
+              </section>
 
               {/* Recent Logs */}
-              <motion.section
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-              >
+              <section>
                 {loadingLogs ? (
                   <div className="glass-card p-8 text-center text-slate-400 text-sm">
                     Loading recent entries...
@@ -321,7 +345,7 @@ export const HomePage: React.FC = () => {
                 ) : (
                   <RecentLogsList logs={logs} />
                 )}
-              </motion.section>
+              </section>
             </motion.div>
           )}
 

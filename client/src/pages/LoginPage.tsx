@@ -75,7 +75,7 @@ export const LoginPage: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xs"
+          className="rounded-3xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-200/50"
         >
           {error && (
             <motion.div
