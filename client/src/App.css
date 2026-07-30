@@ -1,48 +1,54 @@
-/* ── Google Fonts ─────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
 @import 'tailwindcss';
 
-/* ── Custom base styles ──────────────────────────────────────── */
-@layer base {
-  body {
-    @apply bg-stone-50 text-slate-800 antialiased min-h-screen selection:bg-teal-100 selection:text-teal-900;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
-  /* Smooth page scrolling */
-  html {
-    scroll-behavior: smooth;
-  }
+/* ── Custom Base & Font Setup ────────────────────────────────── */
+body {
+  background-color: var(--color-stone-50, #fafaf9);
+  color: var(--color-slate-800, #1e293b);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Component & Utility Layer ───────────────────────────────── */
-@layer components {
-  /* Animated press-down on buttons */
-  .btn-press {
-    @apply transition-all duration-150 ease-in-out active:scale-[0.97];
-  }
+::selection {
+  background-color: var(--color-teal-100, #ccfbf1);
+  color: var(--color-teal-900, #134e4a);
+}
 
-  /* Glass card style (Optimized: semi-transparent white without composite blur layers) */
-  .glass-card {
-    @apply bg-white/95 border border-stone-200/60 rounded-3xl shadow-sm;
-  }
+html {
+  scroll-behavior: smooth;
+}
 
-  /* Scrollbar styling for calendar grids */
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: #d6d3d1 transparent;
-  }
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 4px;
-    width: 4px;
-  }
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-stone-300 rounded-full;
-  }
+/* ── Component & Utility Styles ─────────────────────────────── */
+.btn-press {
+  transition: all 150ms ease-in-out;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Glass card style (Optimized: semi-transparent white without composite blur layers) */
+.glass-card {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(231, 229, 228, 0.6);
+  border-radius: 1.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Scrollbar styling for calendar grids */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3d1 transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #d6d3d1;
+  border-radius: 9999px;
 }
 
 /* ── Micro-animation Keyframes (GPU hardware accelerated) ───── */
