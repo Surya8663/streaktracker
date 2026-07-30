@@ -27,7 +27,7 @@ type Tab = 'log' | 'comparison' | 'milestones' | 'roadmap' | 'profile';
 
 const TAB_CONFIG: { id: Tab; label: string; icon: string }[] = [
   { id: 'log', label: 'Dashboard', icon: '📝' },
-  { id: 'comparison', label: 'Streaks', icon: '🔥' },
+  { id: 'comparison', label: 'Common Area', icon: '⚔️' },
   { id: 'milestones', label: 'Milestones', icon: '🏆' },
   { id: 'roadmap', label: 'Roadmap', icon: '🗺️' },
   { id: 'profile', label: 'Profile', icon: '👤' },
