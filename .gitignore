@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
+# Keep shared package dist so Vercel can resolve @streaktrack/shared types
+!shared/dist/
 
 # Environment files (CRITICAL: never commit secrets or env)
 .env
