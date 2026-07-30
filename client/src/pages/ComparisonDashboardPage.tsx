@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import type { StreakResponse, User, LogUpdatedPayload } from '@streaktrack/shared';
+import type { StreakResponse, User, LogUpdatedPayload, MilestoneResponse } from '@streaktrack/shared';
 import { API_ROUTES, SOCKET_EVENTS } from '@streaktrack/shared';
 import { StreakCalendar } from '../components/StreakCalendar';
 import { Avatar } from '../components/Avatar';
@@ -8,9 +8,93 @@ import { AnimatedCounter } from '../components/AnimatedCounter';
 import { useSocket } from '../context/SocketContext';
 import { getApiUrl } from '../utils/api.js';
 
+function getPercentages(val1: number, val2: number) {
+  const sum = val1 + val2;
+  if (sum === 0) return { pct1: 50, pct2: 50 };
+  let pct1 = (val1 / sum) * 100;
+  let pct2 = (val2 / sum) * 100;
+  if (val1 > 0 && pct1 < 12) { pct1 = 12; pct2 = 88; }
+  if (val2 > 0 && pct2 < 12) { pct2 = 12; pct1 = 88; }
+  return { pct1, pct2 };
+}
+
+interface StatRowProps {
+  title: string;
+  icon: string;
+  val1: number;
+  val2: number;
+  unit?: string;
+  decimals?: number;
+  delay: number;
+}
+
+const StatRow: React.FC<StatRowProps> = ({ title, icon, val1, val2, unit = '', decimals = 0, delay }) => {
+  const { pct1, pct2 } = getPercentages(val1, val2);
+  const formattedVal1 = decimals > 0 ? val1.toFixed(decimals) : val1;
+  const formattedVal2 = decimals > 0 ? val2.toFixed(decimals) : val2;
+
+  const is1Winner = val1 > val2;
+  const is2Winner = val2 > val1;
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs sm:text-sm font-semibold">
+        <div className={`flex items-center gap-1 ${is1Winner ? 'text-amber-700 font-extrabold' : 'text-slate-600'}`}>
+          <span>{formattedVal1} {unit}</span>
+          {is1Winner && <span className="text-xs">🏆</span>}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-slate-700 font-bold uppercase tracking-wider text-[11px] sm:text-xs">
+          <span>{icon}</span>
+          <span>{title}</span>
+        </div>
+
+        <div className={`flex items-center gap-1 ${is2Winner ? 'text-emerald-700 font-extrabold' : 'text-slate-600'}`}>
+          {is2Winner && <span className="text-xs">🏆</span>}
+          <span>{formattedVal2} {unit}</span>
+        </div>
+      </div>
+
+      <div className="relative h-9 w-full rounded-2xl bg-stone-100 border border-stone-200/80 p-1 flex items-center gap-1 shadow-inner overflow-hidden">
+        {/* Surya (Left) Bar */}
+        <motion.div
+          initial={{ width: '0%' }}
+          animate={{ width: `${pct1}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut', delay }}
+          className="h-full rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-400 text-amber-950 font-extrabold text-xs flex items-center justify-end pr-2.5 shadow-xs overflow-hidden whitespace-nowrap min-w-0"
+        >
+          {pct1 >= 15 && (
+            <span className="drop-shadow-xs">
+              {formattedVal1}{unit ? ` ${unit}` : ''}
+            </span>
+          )}
+        </motion.div>
+
+        {/* Gomathi (Right) Bar */}
+        <motion.div
+          initial={{ width: '0%' }}
+          animate={{ width: `${pct2}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut', delay }}
+          className="h-full rounded-xl bg-gradient-to-l from-emerald-400 via-emerald-500 to-teal-400 text-emerald-950 font-extrabold text-xs flex items-center justify-start pl-2.5 shadow-xs overflow-hidden whitespace-nowrap min-w-0"
+        >
+          {pct2 >= 15 && (
+            <span className="drop-shadow-xs">
+              {formattedVal2}{unit ? ` ${unit}` : ''}
+            </span>
+          )}
+        </motion.div>
+
+        {/* Center Divider indicator */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-white/70 backdrop-blur-xs z-10 shadow-xs" />
+      </div>
+    </div>
+  );
+};
+
 export const ComparisonDashboardPage: React.FC = () => {
   const { socket, isOnline } = useSocket();
   const [streaks, setStreaks] = useState<StreakResponse[]>([]);
+  const [milestoneData, setMilestoneData] = useState<MilestoneResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,11 +102,20 @@ export const ComparisonDashboardPage: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch users list
-      const usersRes = await fetch(getApiUrl(API_ROUTES.USERS), { credentials: 'include' });
+      // Fetch users list and milestones
+      const [usersRes, milestoneRes] = await Promise.all([
+        fetch(getApiUrl(API_ROUTES.USERS), { credentials: 'include' }),
+        fetch(getApiUrl(API_ROUTES.MILESTONES), { credentials: 'include' }),
+      ]);
+
       if (!usersRes.ok) throw new Error('Failed to load users');
       const usersData = await usersRes.json();
       const usersList: User[] = usersData.users || [];
+
+      if (milestoneRes.ok) {
+        const mData: MilestoneResponse = await milestoneRes.json();
+        setMilestoneData(mData);
+      }
 
       // Fetch streak for each user
       const streakPromises = usersList.map((u) =>
@@ -220,11 +313,109 @@ export const ComparisonDashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* ── Head-to-Head Racing Stats ──────────────────────────── */}
+      {suryaStreak && gomathiStreak && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+          className="rounded-3xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-sm space-y-6"
+        >
+          {/* Section Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏁</span>
+                <h3 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight">
+                  Head-to-Head Racing Stats
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Tug-of-war progress comparison across key performance metrics
+              </p>
+            </div>
+
+            {/* Legend / User Indicators */}
+            <div className="flex items-center gap-3 text-xs font-bold mt-1 sm:mt-0">
+              <div className="flex items-center gap-1.5 text-amber-900 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-200/60 shadow-2xs">
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                <span>{suryaStreak.user.name}</span>
+              </div>
+              <span className="text-slate-300 font-semibold">vs</span>
+              <div className="flex items-center gap-1.5 text-emerald-900 bg-emerald-100/80 px-3 py-1 rounded-full border border-emerald-200/60 shadow-2xs">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <span>{gomathiStreak.user.name}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stat Rows */}
+          {(() => {
+            let suryaBlockHours = 0;
+            let gomathiBlockHours = 0;
+            if (milestoneData?.currentBlock) {
+              const cb = milestoneData.currentBlock;
+              if (cb.user1Id === suryaStreak.user.id) {
+                suryaBlockHours = cb.user1Hours;
+                gomathiBlockHours = cb.user2Hours;
+              } else if (cb.user2Id === suryaStreak.user.id) {
+                suryaBlockHours = cb.user2Hours;
+                gomathiBlockHours = cb.user1Hours;
+              }
+            }
+
+            return (
+              <div className="space-y-6 pt-1">
+                <StatRow
+                  title="Total Hours Logged (All-Time)"
+                  icon="⏱️"
+                  val1={suryaStreak.totalHours}
+                  val2={gomathiStreak.totalHours}
+                  unit="hrs"
+                  decimals={1}
+                  delay={0.25}
+                />
+
+                <StatRow
+                  title="Current Streak"
+                  icon="🔥"
+                  val1={suryaStreak.currentStreak}
+                  val2={gomathiStreak.currentStreak}
+                  unit="days"
+                  decimals={0}
+                  delay={0.35}
+                />
+
+                <StatRow
+                  title="Longest Streak"
+                  icon="⚡"
+                  val1={suryaStreak.longestStreak}
+                  val2={gomathiStreak.longestStreak}
+                  unit="days"
+                  decimals={0}
+                  delay={0.45}
+                />
+
+                <StatRow
+                  title="Current 5-Day Block Hours"
+                  icon="🍫"
+                  val1={suryaBlockHours}
+                  val2={gomathiBlockHours}
+                  unit="hrs"
+                  decimals={1}
+                  delay={0.55}
+                />
+              </div>
+            );
+          })()}
+        </motion.div>
+      )}
+
       {/* Comparison Overview Card */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
         className="rounded-3xl border border-stone-200/80 bg-gradient-to-r from-teal-900 via-emerald-900 to-slate-900 p-6 sm:p-8 text-white shadow-lg"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
