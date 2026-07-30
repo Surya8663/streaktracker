@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { DailyLog } from '@streaktrack/shared';
 import { API_ROUTES } from '@streaktrack/shared';
+import { getApiUrl } from '../utils/api.js';
 
 interface DailyLogFormProps {
   todayLog: DailyLog | null;
@@ -49,7 +50,7 @@ export const DailyLogForm: React.FC<DailyLogFormProps> = ({ todayLog, onLogSaved
     try {
       let res: Response;
       if (todayLog) {
-        res = await fetch(`${API_ROUTES.LOGS}/${todayLog.id}`, {
+        res = await fetch(getApiUrl(`${API_ROUTES.LOGS}/${todayLog.id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -60,7 +61,7 @@ export const DailyLogForm: React.FC<DailyLogFormProps> = ({ todayLog, onLogSaved
           credentials: 'include',
         });
       } else {
-        res = await fetch(API_ROUTES.LOGS, {
+        res = await fetch(getApiUrl(API_ROUTES.LOGS), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

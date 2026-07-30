@@ -13,6 +13,7 @@ import { RoadmapPage } from './RoadmapPage';
 import { ProfilePage } from './ProfilePage';
 import { APP_NAME, SOCKET_EVENTS, API_ROUTES } from '@streaktrack/shared';
 import type { DailyLog, StreakResponse, LogUpdatedPayload, MilestoneResponse } from '@streaktrack/shared';
+import { getApiUrl } from '../utils/api.js';
 
 function getTodayString(): string {
   const now = new Date();
@@ -62,9 +63,9 @@ export const HomePage: React.FC = () => {
       setLoadingLogs(true);
 
       const [logsRes, streakRes, milestoneRes] = await Promise.all([
-        fetch(`${API_ROUTES.LOGS}/${user.id}`, { credentials: 'include' }),
-        fetch(`${API_ROUTES.STREAKS}/${user.id}`, { credentials: 'include' }),
-        fetch(API_ROUTES.MILESTONES, { credentials: 'include' }),
+        fetch(getApiUrl(`${API_ROUTES.LOGS}/${user.id}`), { credentials: 'include' }),
+        fetch(getApiUrl(`${API_ROUTES.STREAKS}/${user.id}`), { credentials: 'include' }),
+        fetch(getApiUrl(API_ROUTES.MILESTONES), { credentials: 'include' }),
       ]);
 
       if (logsRes.ok) {

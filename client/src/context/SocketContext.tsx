@@ -26,8 +26,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([]);
 
   useEffect(() => {
+    const socketUrl = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || 'https://streaktracker-back.onrender.com';
     const newSocket: Socket<ServerToClientEvents, ClientToServerEvents> = io(
-      import.meta.env.VITE_WS_URL || 'http://localhost:3001',
+      socketUrl,
       {
         withCredentials: true,
         transports: ['websocket', 'polling'],

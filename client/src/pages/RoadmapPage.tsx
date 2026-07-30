@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_ROUTES } from '@streaktrack/shared';
 import type { RoadmapResponse, RoadmapPhase } from '@streaktrack/shared';
+import { getApiUrl } from '../utils/api.js';
 
 export const RoadmapPage: React.FC = () => {
   const [data, setData] = useState<RoadmapResponse | null>(null);
@@ -19,7 +20,7 @@ export const RoadmapPage: React.FC = () => {
   const fetchRoadmap = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(API_ROUTES.ROADMAP, { credentials: 'include' });
+      const res = await fetch(getApiUrl(API_ROUTES.ROADMAP), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load placement roadmap');
       const roadmapData: RoadmapResponse = await res.json();
       setData(roadmapData);
@@ -49,7 +50,7 @@ export const RoadmapPage: React.FC = () => {
 
     try {
       setSaving(true);
-      const res = await fetch(`${API_ROUTES.ROADMAP}/phases/${editingPhase.id}`, {
+      const res = await fetch(getApiUrl(`${API_ROUTES.ROADMAP}/phases/${editingPhase.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -6,6 +6,7 @@ import { StreakCalendar } from '../components/StreakCalendar';
 import { Avatar } from '../components/Avatar';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { useSocket } from '../context/SocketContext';
+import { getApiUrl } from '../utils/api.js';
 
 export const ComparisonDashboardPage: React.FC = () => {
   const { socket, isOnline } = useSocket();
@@ -18,14 +19,14 @@ export const ComparisonDashboardPage: React.FC = () => {
       setLoading(true);
 
       // Fetch users list
-      const usersRes = await fetch(API_ROUTES.USERS, { credentials: 'include' });
+      const usersRes = await fetch(getApiUrl(API_ROUTES.USERS), { credentials: 'include' });
       if (!usersRes.ok) throw new Error('Failed to load users');
       const usersData = await usersRes.json();
       const usersList: User[] = usersData.users || [];
 
       // Fetch streak for each user
       const streakPromises = usersList.map((u) =>
-        fetch(`${API_ROUTES.STREAKS}/${u.id}`, { credentials: 'include' }).then((r) => r.json()),
+        fetch(getApiUrl(`${API_ROUTES.STREAKS}/${u.id}`), { credentials: 'include' }).then((r) => r.json()),
       );
 
       const streakResults: StreakResponse[] = await Promise.all(streakPromises);

@@ -6,6 +6,7 @@ import { Avatar } from '../components/Avatar';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { getApiUrl } from '../utils/api.js';
 
 export const ProfilePage: React.FC = () => {
   const { user, checkAuth } = useAuth();
@@ -28,7 +29,7 @@ export const ProfilePage: React.FC = () => {
     if (!user) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API_ROUTES.PROFILE}/${user.id}`, { credentials: 'include' });
+      const res = await fetch(getApiUrl(`${API_ROUTES.PROFILE}/${user.id}`), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load profile');
       const data: ProfileStatsResponse = await res.json();
       setProfileData(data);
@@ -49,7 +50,7 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     try {
       setSavingBio(true);
-      const res = await fetch(API_ROUTES.PROFILE, {
+      const res = await fetch(getApiUrl(API_ROUTES.PROFILE), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -77,7 +78,7 @@ export const ProfilePage: React.FC = () => {
 
     try {
       setUploadingAvatar(true);
-      const res = await fetch(API_ROUTES.UPLOAD_AVATAR, {
+      const res = await fetch(getApiUrl(API_ROUTES.UPLOAD_AVATAR), {
         method: 'POST',
         credentials: 'include',
         body: formData,

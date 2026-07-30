@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, LoginResponse } from '@streaktrack/shared';
 import { API_ROUTES } from '@streaktrack/shared';
+import { getApiUrl } from '../utils/api.js';
 
 interface AuthContextType {
   user: User | null;
@@ -19,7 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check current auth status
   const checkAuth = async () => {
     try {
-      const res = await fetch(API_ROUTES.AUTH_ME, {
+      const res = await fetch(getApiUrl(API_ROUTES.AUTH_ME), {
         credentials: 'include',
       });
       if (res.ok) {
@@ -41,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch(API_ROUTES.AUTH_LOGIN, {
+    const res = await fetch(getApiUrl(API_ROUTES.AUTH_LOGIN), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -59,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await fetch(API_ROUTES.AUTH_LOGOUT, {
+      await fetch(getApiUrl(API_ROUTES.AUTH_LOGOUT), {
         method: 'POST',
         credentials: 'include',
       });

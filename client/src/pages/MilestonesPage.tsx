@@ -6,6 +6,7 @@ import type { MilestoneResponse, Milestone, LogUpdatedPayload, MilestoneWonPaylo
 import { Avatar } from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { getApiUrl } from '../utils/api.js';
 
 export const MilestonesPage: React.FC = () => {
   const { user } = useAuth();
@@ -17,7 +18,7 @@ export const MilestonesPage: React.FC = () => {
   const fetchMilestones = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(API_ROUTES.MILESTONES, { credentials: 'include' });
+      const res = await fetch(getApiUrl(API_ROUTES.MILESTONES), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load milestones');
       const milestoneData: MilestoneResponse = await res.json();
       setData(milestoneData);
